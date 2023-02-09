@@ -8,7 +8,9 @@ from lib.utils.geometry import perspective_projection
 from lib.utils.torch_utils import tensor_to, tensor_to_numpy
 from lib.utils.tools import get_eta_str, convert_sec_to_time
 from lib.utils.joints import get_joints_info
-from lib.utils.torch_transform import heading_to_vec, quat_mul, rotation_matrix_to_quaternion, angle_axis_to_quaternion, inverse_transform, make_transform, quat_angle_diff, rot6d_to_rotmat, rotmat_to_rot6d, transform_trans, transform_rot, quaternion_to_angle_axis, vec_to_heading
+from lib.utils.torch_transform import heading_to_vec, quat_mul, rotation_matrix_to_quaternion, angle_axis_to_quaternion,\
+    inverse_transform, make_transform, quat_angle_diff, rot6d_to_rotmat, rotmat_to_rot6d, transform_trans, transform_rot, \
+    quaternion_to_angle_axis, vec_to_heading, rotation_matrix_to_angle_axis
 from global_recon.models.loss_func import loss_func_dict
 from motion_infiller.models.motion_traj_joint_model import MotionTrajJointModel
 from motion_infiller.utils.config_motion_traj import Config as MotionTrajConfig
@@ -29,7 +31,7 @@ class GlobalReconOptimizer:
 
         self.cur_iter = 0
         
-        self.smpl = SMPL(SMPL_MODEL_DIR, pose_type='body26fk', create_transl=False).to(device)
+        self.smpl = SMPL(SMPL_MODEL_DIR, create_transl=False).to(device)  # , pose_type='body26fk'
         self.use_gt = specs.get('use_gt', False)
         self.est_type = specs.get('est_type', 'hybrik')
         # flags
@@ -74,14 +76,17 @@ class GlobalReconOptimizer:
 
     def init_data(self, in_dict):
         person_data = dict()
-        num_fr = len(in_dict['est'][0]['bboxes_dict']['exist'])
+        try:
+            num_fr = len(in_dict['est'][0]['bboxes_dict']['exist'])
+        except:
+            num_fr = in_dict['est']['smpl_vertices'].shape[0]
         cam_pose = torch.eye(4).repeat((num_fr, 1, 1)).float().to(self.device)
         cam_pose_inv = inverse_transform(cam_pose)
         
         src_joint_info = get_joints_info("smpl")
-        dst_joint_info = get_joints_info("body26fk")
+        dst_joint_info = get_joints_info("smpl")
         dst_dict = dict((v, k) for k, v in dst_joint_info.name.items())
-        smpl_to_body26fk = np.array([(dst_dict[v], k) for k, v in src_joint_info.name.items() if v in dst_dict.keys()])
+        smpl_to_smpl = np.array([(dst_dict[v], k) for k, v in src_joint_info.name.items() if v in dst_dict.keys()])
 
         if self.est_type == 'hybrik':
             for idx, pose_dict in in_dict['est'].items():
@@ -110,7 +115,7 @@ class GlobalReconOptimizer:
                 smpl_joints2d = pose_dict['kp_2d'][:, :24]
                 kp_2d_with_score = np.zeros((sum(new_dict['vis_frames']), 26, 3))
                 smpl_joints2d = np.concatenate((smpl_joints2d, np.ones_like(smpl_joints2d[:, :, [0]])), axis=-1)
-                kp_2d_with_score[:, smpl_to_body26fk[:, 0]] = smpl_joints2d[:, smpl_to_body26fk[:, 1]]
+                kp_2d_with_score[:, smpl_to_smpl[:, 0]] = smpl_joints2d[:, smpl_to_smpl[:, 1]]
                 new_dict['kp_2d'] = kp_2d_with_score[:, :, :2]
                 new_dict['kp_2d_score'] = kp_2d_with_score[:, :, 2]
                 new_dict['kp_2d_aligned'] = new_dict['kp_2d'].copy()
@@ -138,6 +143,63 @@ class GlobalReconOptimizer:
                 new_dict['smpl_pose_nofill'] = new_dict['smpl_pose'].clone()
                 new_dict['smpl_pose_nofill'][~new_dict['exist_frames']] = 0.0
                 person_data[idx] = new_dict
+        elif self.est_type == 'pare':
+            new_dict = dict()
+            new_dict['visible'] = visible = in_dict['gt']['frames']['frame_visible'].copy()
+            new_dict['visible_orig'] = new_dict['visible'].copy()
+            new_dict['fr_start'] = start = np.where(visible)[0][0]
+            new_dict['fr_end'] = end = np.where(visible)[0][-1] + 1
+            new_dict['exist_frames'] = visible == 1
+            new_dict['exist_frames'][start:end] = True
+            new_dict['exist_len'] = end - start
+            new_dict['max_len'] = max_len = visible.shape[0]
+            new_dict['frames'] = np.arange(max_len)
+            new_dict['vis_frames'] = vis_frames = visible == 1
+            new_dict['invis_frames'] = invis_frames = visible == 0
+            new_dict['frame2ind'] = {f: i for i, f in enumerate(new_dict['frames'])}
+            new_dict['scale'] = None
+            smpl_pose_wroot = rotation_matrix_to_angle_axis(
+                torch.tensor(in_dict['est']['pred_pose'], device=self.device)).cpu().numpy()
+            new_dict['smpl_pose'] = smpl_pose_wroot[:, 1:].reshape(-1, 69)
+
+            new_dict['smpl_pose_gt'] = in_dict['gt']['smpl_parameters']['pose_cam'][:, 3:]
+            new_dict['smpl_beta'] = in_dict['est']['pred_shape']
+            new_dict['smpl_orient_cam'] = smpl_pose_wroot[:, 0]
+            new_dict['root_trans_cam'] = in_dict['est']['smpl_joints3d'][:, 8, :]  # 8 as the root of human TODO: check
+
+            smpl_joints2d = in_dict['est']['smpl_joints2d']  # [:, :24]
+            kp_2d_with_score = np.zeros((sum(new_dict['vis_frames']), 49, 3))  # 24
+            smpl_joints2d = np.concatenate((smpl_joints2d, np.ones_like(smpl_joints2d[:, :, [0]])), axis=-1)
+            kp_2d_with_score[:, smpl_to_smpl[:, 0]] = smpl_joints2d[:, smpl_to_smpl[:, 1]]
+            new_dict['kp_2d_pred'] = kp_2d_with_score[:, :, :2]
+            new_dict['kp_2d_score'] = kp_2d_with_score[:, :, 2]
+            new_dict['kp_2d_aligned'] = in_dict['gt']['joints']['j2d']  # new_dict['kp_2d'].copy()
+            # new_dict['cam_K'] = np.array([5000, 0, 0, 0, 5000, 0, 0, 0, 1]).reshape((3, 3)).astype(np.float32)
+            # TODO: check cam_K, also kp_2d has been changed
+            # pad motion to have video length
+            if not np.all(new_dict['visible']):
+                for key in ['kp_2d', 'kp_2d_score', 'kp_2d_aligned', 'cam_K']:
+                    new_val = np.zeros((max_len,) + new_dict[key].shape[1:], dtype=new_dict[key].dtype)
+                    new_val[vis_frames] = new_dict[key]
+                    new_dict[key] = new_val
+                for key in ['smpl_pose', 'smpl_beta', 'root_trans_cam', 'smpl_orient_cam']:
+                    vis_ind = np.where(visible)[0]
+                    f = interp1d(vis_ind.astype(np.float32), new_dict[key], axis=0, assume_sorted=True,
+                                 fill_value="extrapolate")
+                    new_val = f(np.arange(max_len, dtype=np.float32))
+                    new_dict[key] = new_val
+            new_dict = tensor_to(new_dict, self.device)
+            if self.flag_filter_pose:
+                self.filter_pose(new_dict)
+            # get world pose
+            new_dict['root_trans_world'] = transform_trans(cam_pose_inv, new_dict['root_trans_cam'])
+            new_dict['smpl_orient_world'] = transform_rot(cam_pose_inv, new_dict['smpl_orient_cam'])
+            new_dict['root_trans_world_base'] = new_dict['root_trans_world'].clone()
+            new_dict['smpl_orient_world_base'] = new_dict['smpl_orient_world'].clone()
+            # mask invisible frames
+            new_dict['smpl_pose_nofill'] = new_dict['smpl_pose'].clone()
+            new_dict['smpl_pose_nofill'][~new_dict['exist_frames']] = 0.0
+            person_data[0] = new_dict
         else:
             raise ValueError(f'est_type {self.est_type} not supported')
 

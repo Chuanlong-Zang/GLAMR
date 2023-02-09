@@ -1,6 +1,7 @@
 import numpy as np
 import torch
-from .konia_transform import quaternion_to_angle_axis, angle_axis_to_quaternion, quaternion_to_rotation_matrix, rotation_matrix_to_quaternion, rotation_matrix_to_angle_axis, angle_axis_to_rotation_matrix
+from .konia_transform import quaternion_to_angle_axis, angle_axis_to_quaternion, quaternion_to_rotation_matrix, \
+    rotation_matrix_to_quaternion, rotation_matrix_to_angle_axis, angle_axis_to_rotation_matrix, rotation_matrix_to_angle_axis
 
 
 def normalize(x, eps: float = 1e-9):

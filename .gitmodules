@@ -1,3 +1,6 @@
 [submodule "HybrIK"]
 	path = HybrIK
 	url = https://github.com/Jeff-sjtu/HybrIK.git
+[submodule "PARE"]
+	path = PARE
+	url = https://github.com/Chuanlong-Zang/PARE

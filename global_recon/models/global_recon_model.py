@@ -2,6 +2,7 @@ import time
 import os
 import torch
 import numpy as np
+import json
 from scipy.interpolate import interp1d
 from lib.models.smpl import SMPL, SMPL_MODEL_DIR
 from lib.utils.geometry import perspective_projection
@@ -165,26 +166,26 @@ class GlobalReconOptimizer:
             new_dict['smpl_pose_gt'] = in_dict['gt']['smpl_parameters']['pose_cam'][:, 3:]
             new_dict['smpl_beta'] = in_dict['est']['pred_shape']
             new_dict['smpl_orient_cam'] = smpl_pose_wroot[:, 0]
-            new_dict['root_trans_cam'] = in_dict['est']['smpl_joints3d'][:, 8, :]  # 8 as the root of human TODO: check
+            new_dict['root_trans_cam'] = in_dict['est']['smpl_joints3d'][:, 8, :]  # 8 as the root of human
 
             smpl_joints2d = in_dict['est']['smpl_joints2d']  # [:, :24]
             kp_2d_with_score = np.zeros((sum(new_dict['vis_frames']), 49, 3))  # 24
             smpl_joints2d = np.concatenate((smpl_joints2d, np.ones_like(smpl_joints2d[:, :, [0]])), axis=-1)
-            kp_2d_with_score[:, smpl_to_smpl[:, 0]] = smpl_joints2d[:, smpl_to_smpl[:, 1]]
-            new_dict['kp_2d_pred'] = kp_2d_with_score[:, :, :2]
+            kp_2d_with_score[:, smpl_to_smpl[:, 0]] = smpl_joints2d[new_dict['visible'].astype(bool)][:, smpl_to_smpl[:, 1]]
+            new_dict['kp_2d'] = kp_2d_with_score[:, :, :2]
             new_dict['kp_2d_score'] = kp_2d_with_score[:, :, 2]
             new_dict['kp_2d_aligned'] = in_dict['gt']['joints']['j2d']  # new_dict['kp_2d'].copy()
-            # new_dict['cam_K'] = np.array([5000, 0, 0, 0, 5000, 0, 0, 0, 1]).reshape((3, 3)).astype(np.float32)
+            new_dict['cam_K'] = np.array([5000, 0, 0, 0, 5000, 0, 0, 0, 1]).reshape((3, 3)).astype(np.float32)
             # TODO: check cam_K, also kp_2d has been changed
             # pad motion to have video length
             if not np.all(new_dict['visible']):
-                for key in ['kp_2d', 'kp_2d_score', 'kp_2d_aligned', 'cam_K']:
+                for key in ['kp_2d', 'kp_2d_score']:  # no 'kp_2d_aligned' since use gt, 'cam_K' constant
                     new_val = np.zeros((max_len,) + new_dict[key].shape[1:], dtype=new_dict[key].dtype)
                     new_val[vis_frames] = new_dict[key]
                     new_dict[key] = new_val
                 for key in ['smpl_pose', 'smpl_beta', 'root_trans_cam', 'smpl_orient_cam']:
                     vis_ind = np.where(visible)[0]
-                    f = interp1d(vis_ind.astype(np.float32), new_dict[key], axis=0, assume_sorted=True,
+                    f = interp1d(vis_ind.astype(np.float32), new_dict[key][visible==1], axis=0, assume_sorted=True,
                                  fill_value="extrapolate")
                     new_val = f(np.arange(max_len, dtype=np.float32))
                     new_dict[key] = new_val
@@ -278,6 +279,7 @@ class GlobalReconOptimizer:
             'cam_inv_rot_residual': cam_inv_rot_residual,
             'cam_inv_trans_residual': cam_inv_trans_residual,
             'rel_transform_cam': rel_transform_cam,
+            # 'smpl_segment_idx': json.load(open('data/body_models/smpl/smpl_vert_segmentation.json', 'r')),
             'gt': in_dict['gt'],
             'gt_meta': in_dict['gt_meta'],
             'meta': meta

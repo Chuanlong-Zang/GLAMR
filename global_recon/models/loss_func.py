@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from lib.utils.torch_transform import heading_to_vec, quat_angle_diff, rotmat_to_rot6d, angle_axis_to_rot6d, angle_axis_to_quaternion, inverse_transform, rotation_matrix_to_quaternion
+from lib.utils.torch_transform import heading_to_vec, quat_angle_diff, rotmat_to_rot6d, angle_axis_to_rot6d, angle_axis_to_quaternion, inverse_transform, rotation_matrix_to_quaternion, rot6d_to_rotmat
 
 
 def gmof(x, sigma):

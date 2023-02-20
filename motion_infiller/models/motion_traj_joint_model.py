@@ -27,7 +27,8 @@ class MotionTrajJointModel:
         self.multi_step_trajpred = cfg.multi_step_trajpred
         self.smpl = SMPL(SMPL_MODEL_DIR, pose_type='body26fk', create_transl=False).to(device)
         self.load_motion_infiller()
-        self.load_trajectory_predictor()
+        # self.load_trajectory_predictor()
+        self.traj_predictor = None
 
     def load_motion_infiller(self):
         if 'mfiller_cfg' in self.specs:

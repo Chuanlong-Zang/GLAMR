@@ -24,7 +24,7 @@ import tqdm
 parser = argparse.ArgumentParser()
 parser.add_argument('--cfg', default='glamr_dynamic')
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
-parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody')
+parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody_add_optimization')
 parser.add_argument('--gt_dir', default='dataset/egobody_preprocessed/test')
 parser.add_argument('--evl_num', default=5)   # 0 means all
 parser.add_argument('--gpu', type=int, default=0)
@@ -87,7 +87,7 @@ for i in tqdm.tqdm(range(args.evl_num)):
     log = create_logger(f'{out_dir}/log.txt')
     grecon_path = f'{out_dir}/grecon'
     render_path = f'{out_dir}/grecon_videos'
-    seq_name = args.out_dir.split('/')[-1]
+    seq_name = 'egobody'  # args.out_dir.split('/')[-1]
 
     out_file = f'{grecon_path}/{seq_name}_result.pkl'
     if osp.exists(out_file):

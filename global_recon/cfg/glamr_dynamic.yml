@@ -7,9 +7,9 @@ grecon_model_specs:
   # flags
   est_type: pare #hybrik
   flag_infer_motion_traj: true
-  flag_pred_traj: true
+  flag_pred_traj: false #true
   flag_opt_traj: true
-  flag_opt_cam: true
+  flag_opt_cam: false # true
   flag_fixed_cam: false
   flag_init_cam_all_frames: true
 
@@ -20,7 +20,9 @@ opt_stage_specs:
 
     opt_lr: 1.e-2
     opt_niters: 500
-    opt_variables:  ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
+    opt_variables: ['world_res']
+    # ['global_orient', 'global_trans']
+    # ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
 
     loss_cfg:
       rel_transform:
@@ -43,31 +45,32 @@ opt_stage_specs:
         weight: 1.e+3
 
       # reg loss
-      local_traj_dxy_reg:
-        weight: 3.e+2
-      local_traj_dheading_reg_new:
-        weight: 3.e+3
-      local_traj_rot_reg:
-        weight: 5.e+3
-      local_traj_z_reg:
-        weight: 1.e+2
-      cam_inv_trans_residual_reg:
-        weight: 1.e+2
+      # local_traj_dxy_reg:
+      #   weight: 3.e+2
+      # local_traj_dheading_reg_new:
+      #   weight: 3.e+3
+      # local_traj_rot_reg:
+      #   weight: 5.e+3
+      # local_traj_z_reg:
+      #   weight: 1.e+2
+      # cam_inv_trans_residual_reg:
+      #   weight: 1.e+2
 
       # camera loss
-      cam_inv_rot_smoothness:
-        weight: 1.e+1
-      cam_origin_smoothness:
-        weight: 1.e+3
-      cam_up_reg:
-        weight: 1.e+6
+      # cam_inv_rot_smoothness:
+      #   weight: 1.e+1
+      # cam_origin_smoothness:
+      #   weight: 1.e+3
+      # cam_up_reg:
+      #   weight: 1.e+6
 
 
   main_opt:
 
     opt_lr: 1.e-3
     opt_niters: 500
-    opt_variables:  ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
+    opt_variables: ['world_res']
+    # ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
 
     loss_cfg:
       rel_transform:
@@ -90,21 +93,21 @@ opt_stage_specs:
         weight: 1.e+3
 
       # reg loss
-      local_traj_dxy_reg:
-        weight: 3.e+2
-      local_traj_dheading_reg_new:
-        weight: 3.e+3
-      local_traj_rot_reg:
-        weight: 5.e+3
-      local_traj_z_reg:
-        weight: 1.e+2
-      cam_inv_trans_residual_reg:
-        weight: 1.e+2
+      # local_traj_dxy_reg:
+      #   weight: 3.e+2
+      # local_traj_dheading_reg_new:
+      #   weight: 3.e+3
+      # local_traj_rot_reg:
+      #   weight: 5.e+3
+      # local_traj_z_reg:
+      #   weight: 1.e+2
+      # cam_inv_trans_residual_reg:
+      #   weight: 1.e+2
 
       # camera loss
-      cam_inv_rot_smoothness:
-        weight: 1.e+1
-      cam_origin_smoothness:
-        weight: 1.e+3
-      cam_up_reg:
-        weight: 1.e+6
+      # cam_inv_rot_smoothness:
+      #   weight: 1.e+1
+      # cam_origin_smoothness:
+      #   weight: 1.e+3
+      # cam_up_reg:
+      #   weight: 1.e+6

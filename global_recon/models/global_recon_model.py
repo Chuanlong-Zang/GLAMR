@@ -60,6 +60,7 @@ class GlobalReconOptimizer:
         self.heading_type = specs.get('heading_type', 'scalar')
         self.absolute_heading = specs.get('absolute_heading', False)
         self.cam_fix_frames = specs.get('cam_fix_frames', [[0, None]])
+        self.flag_gt_camera = None
         # main opt
         self.opt_stage_specs = self.cfg.opt_stage_specs
 
@@ -79,10 +80,17 @@ class GlobalReconOptimizer:
         person_data = dict()
         try:
             num_fr = len(in_dict['est'][0]['bboxes_dict']['exist'])
-        except:
+        except KeyError:
             num_fr = in_dict['est']['smpl_vertices'].shape[0]
-        cam_pose = torch.eye(4).repeat((num_fr, 1, 1)).float().to(self.device)
-        cam_pose_inv = inverse_transform(cam_pose)
+
+        try:  # if gt pose exists
+            cam_pose = torch.tensor(in_dict['gt']['meta']['cam_pose']).float().to(self.device)
+            cam_pose_inv = inverse_transform(cam_pose)
+            self.flag_gt_camera = True
+        except KeyError:  # if no gt camera poses
+            cam_pose = torch.eye(4).repeat((num_fr, 1, 1)).float().to(self.device)
+            cam_pose_inv = inverse_transform(cam_pose)
+            self.flag_gt_camera = False
         
         src_joint_info = get_joints_info("smpl")
         dst_joint_info = get_joints_info("smpl")
@@ -175,7 +183,10 @@ class GlobalReconOptimizer:
             new_dict['kp_2d'] = kp_2d_with_score[:, :, :2]
             new_dict['kp_2d_score'] = kp_2d_with_score[:, :, 2]
             new_dict['kp_2d_aligned'] = in_dict['gt']['joints']['j2d']  # new_dict['kp_2d'].copy()
-            new_dict['cam_K'] = np.array([5000, 0, 0, 0, 5000, 0, 0, 0, 1]).reshape((3, 3)).astype(np.float32)
+            try:
+                new_dict['cam_K'] = in_dict['gt']['meta']['cam_K'].reshape((3, 3)).astype(np.float32)
+            except KeyError:
+                new_dict['cam_K'] = np.array([5000, 0, 0, 0, 5000, 0, 0, 0, 1]).reshape((3, 3)).astype(np.float32)
             # TODO: check cam_K, also kp_2d has been changed
             # pad motion to have video length
             if not np.all(new_dict['visible']):
@@ -193,6 +204,10 @@ class GlobalReconOptimizer:
             if self.flag_filter_pose:
                 self.filter_pose(new_dict)
             # get world pose
+            if self.flag_gt_camera:
+                dxyz = self.calculate_gt_camera(new_dict, in_dict)
+                new_dict['root_trans_cam'] += dxyz
+
             new_dict['root_trans_world'] = transform_trans(cam_pose_inv, new_dict['root_trans_cam'])
             new_dict['smpl_orient_world'] = transform_rot(cam_pose_inv, new_dict['smpl_orient_cam'])
             new_dict['root_trans_world_base'] = new_dict['root_trans_world'].clone()
@@ -214,8 +229,9 @@ class GlobalReconOptimizer:
                 self.infer_motion_traj(pose_dict)
         
         if not (self.flag_infer_motion_traj and self.flag_pred_traj):
-            for pose_dict in person_data.values():
-                self.init_default_traj(pose_dict)
+            if not self.flag_gt_camera:
+                for pose_dict in person_data.values():
+                    self.init_default_traj(pose_dict)
 
         # base trans and rot
         for pose_dict in person_data.values():
@@ -252,10 +268,10 @@ class GlobalReconOptimizer:
                         
                     pose_dict['traj_local_z'] = torch.zeros((exist_len,), device=self.device)
                     pose_dict['traj_local_rot'] = torch.zeros((exist_len, 6), device=self.device)
-            else:
-                for pose_dict in person_data.values():
-                    pose_dict['root_trans_world_base'][:] = pose_dict['root_trans_world_base'][0]
-                    pose_dict['smpl_orient_world_base'][:] = pose_dict['smpl_orient_world_base'][0]
+            # else:
+            #     for pose_dict in person_data.values():
+            #         pose_dict['root_trans_world_base'][:] = pose_dict['root_trans_world_base'][0]
+            #         pose_dict['smpl_orient_world_base'][:] = pose_dict['smpl_orient_world_base'][0]
         else:
             rel_transform_cam = None
 
@@ -276,8 +292,8 @@ class GlobalReconOptimizer:
             'fr_num_persons': fr_num_persons,
             'cam_pose': cam_pose,
             'cam_pose_inv': cam_pose_inv,
-            'cam_inv_rot_residual': cam_inv_rot_residual,
-            'cam_inv_trans_residual': cam_inv_trans_residual,
+            # 'cam_inv_rot_residual': cam_inv_rot_residual,
+            # 'cam_inv_trans_residual': cam_inv_trans_residual,
             'rel_transform_cam': rel_transform_cam,
             # 'smpl_segment_idx': json.load(open('data/body_models/smpl/smpl_vert_segmentation.json', 'r')),
             'gt': in_dict['gt'],
@@ -288,7 +304,8 @@ class GlobalReconOptimizer:
         if self.flag_use_pen_loss:
             data['sdf_loss'] = self.sdf_loss
 
-        self.init_cam_pose(data)
+        if not self.flag_gt_camera:
+            self.init_cam_pose(data)
 
         if self.flag_traj_from_cam:
             self.get_traj_from_cam(data)
@@ -297,7 +314,8 @@ class GlobalReconOptimizer:
             self.init_traj_heading_from_cam(person_data, data)
 
         if self.flag_init_cam_all_frames:
-            self.init_cam_pose(data, all_frames=True)
+            if not self.flag_gt_camera:
+                self.init_cam_pose(data, all_frames=True)
 
         self.forward(data, [], {'stage': 'init'})
 
@@ -647,8 +665,11 @@ class GlobalReconOptimizer:
     def get_parameter(self, data, opt_variables):
         param_list = []
         if 'cam' not in opt_variables:
-            param_list.append(data['cam_inv_rot_residual'])
-            param_list.append(data['cam_inv_trans_residual'])
+            try:
+                param_list.append(data['cam_inv_rot_residual'])
+                param_list.append(data['cam_inv_trans_residual'])
+            except:
+                pass
         if 'cam' in opt_variables:
             if self.flag_fixed_cam:
                 data['cam_rot_6d_fix'] = rotmat_to_rot6d(data['cam_pose'][[0], :3, :3]).detach()
@@ -686,6 +707,12 @@ class GlobalReconOptimizer:
                     pose_dict['world_dxy'] = torch.zeros_like(pose_dict['smpl_orient_world'][..., :2])
                 param_list.append(pose_dict['world_dxy'])
 
+        # for pose_dict in data['person_data'].values():
+        #     if 'global_orient' in opt_variables:
+        #         param_list.append(pose_dict['smpl_orient_world'])
+        #     if 'global_trans' in opt_variables:
+        #         param_list.append(pose_dict['root_trans_world'])
+
         return param_list
 
     def init_opt(self, data, opt_variables, opt_lr):
@@ -713,4 +740,44 @@ class GlobalReconOptimizer:
             print(info_str)
         else:
             self.log.info(info_str)
-            
+
+    def calculate_gt_camera(self, new_dict, in_dict):
+        dxyz = np.zeros_like(new_dict['root_trans_cam'])
+        vis_ind = np.where(new_dict['visible'])[0]
+        for i in vis_ind:
+            dx, dy, dz = 0, 0, 0
+            cx, cy, h, _ = in_dict['est']['bboxes'][i]
+            fx, fy = in_dict['gt']['meta']['cam_K'][0], in_dict['gt']['meta']['cam_K'][4]
+            ox, oy = in_dict['gt']['meta']['cam_K'][2], in_dict['gt']['meta']['cam_K'][5]
+            f, res = 5000, 224
+            delta_x, delta_y, delta_z = in_dict['est']['pred_cam_t'][i]
+            x, y, z = in_dict['est']['smpl_joints3d'][i, :, 0], in_dict['est']['smpl_joints3d'][i, :, 1], \
+                in_dict['est']['smpl_joints3d'][i, :, 2]
+
+            # then use the best estimated value - least square problem
+            n = x.shape[0]
+            A, b = np.zeros((2 * n, 3)), np.zeros((2 * n,))
+
+            A[:n, 0], A[n:, 1] = fx, fy
+            xz, yz = ox - (cx + h / res * f * (x + delta_x) / (z + delta_z)), oy - (
+                    cy + h / res * f * (y + delta_y) / (z + delta_z))
+            A[:n, -1], A[n:, -1] = xz, yz
+            b[:n], b[n:] = -(fx * x + xz * z), -(fy * y + yz * z)
+
+            joint_visibility = np.zeros((n,))
+            for j in range(n):
+                u, v = in_dict['est']['smpl_joints2d'].squeeze()[i, j]
+                if (u >= 0) and (u <= 1920) and (v >= 0) and (v <= 1080):
+                    joint_visibility[j] = 1
+
+            weight2 = np.reshape(np.tile(np.sqrt(joint_visibility), (1, 2)).T, -1)
+            W = np.diagflat(weight2)
+            WA, Wb = W @ A, W @ b
+            dxyz_weighted = np.linalg.inv(WA.T @ WA) @ WA.T @ Wb
+            # np.sum((dxyz_weighted - gt_trans) ** 2)
+            dxyz[i] = dxyz_weighted
+
+        f = interp1d(vis_ind.astype(np.float32), dxyz[new_dict['visible'] == 1], axis=0, assume_sorted=True,
+                     fill_value="extrapolate")
+        dxyz_new = f(np.arange(new_dict['visible'].shape[0], dtype=np.float32))
+        return dxyz_new

@@ -18,7 +18,7 @@ opt_stage_specs:
 
   init_opt:
 
-    opt_lr: 1.e-3
+    opt_lr: 1.e-2
     opt_niters: 500
     opt_variables:  ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
 
@@ -65,7 +65,7 @@ opt_stage_specs:
 
   main_opt:
 
-    opt_lr: 1.e-4
+    opt_lr: 1.e-3
     opt_niters: 500
     opt_variables:  ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
 

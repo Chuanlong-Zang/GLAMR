@@ -26,7 +26,7 @@ parser.add_argument('--cfg', default='glamr_dynamic')
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
 parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody')
 parser.add_argument('--gt_dir', default='dataset/egobody_preprocessed/test')
-parser.add_argument('--evl_num', default=5)
+parser.add_argument('--evl_num', default=5)   # 0 means all
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--cached', type=int, default=1)
 parser.add_argument('--save_video', action='store_true', default=False)
@@ -56,6 +56,8 @@ def merge_results(file_list):
     return results
 
 
+if args.evl_num == '0':
+    args.evl_num = len(test_split_list)
 for i in tqdm.tqdm(range(args.evl_num)):
     recording_name = test_split_list[i]
     print(f'Optimizing {recording_name}.')

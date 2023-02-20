@@ -88,16 +88,19 @@ for i in tqdm.tqdm(range(args.evl_num)):
     grecon_path = f'{out_dir}/grecon'
     render_path = f'{out_dir}/grecon_videos'
     seq_name = args.out_dir.split('/')[-1]
-    os.makedirs(grecon_path, exist_ok=True)
-    os.makedirs(render_path, exist_ok=True)
-
-    gt_dir = os.path.join(args.gt_dir, f'{recording_name}.pkl')
-    gt_result = joblib.load(gt_dir)
-    in_dict = {'est': pare_results, 'gt': gt_result, 'gt_meta': dict(), 'seq_name': seq_name}
-    grecon_model = model_dict[cfg.grecon_model_name](cfg, device, log)  # global recon model
-    out_dict = grecon_model.optimize(in_dict)
 
     out_file = f'{grecon_path}/{seq_name}_result.pkl'
-    pickle.dump(out_dict, open(out_file, 'wb'))
+    if osp.exists(out_file):
+        print(f'{recording_name} already has been analysed!')
+    else:
+        os.makedirs(grecon_path, exist_ok=True)
+        os.makedirs(render_path, exist_ok=True)
+
+        gt_dir = os.path.join(args.gt_dir, f'{recording_name}.pkl')
+        gt_result = joblib.load(gt_dir)
+        in_dict = {'est': pare_results, 'gt': gt_result, 'gt_meta': dict(), 'seq_name': seq_name}
+        grecon_model = model_dict[cfg.grecon_model_name](cfg, device, log)  # global recon model
+        out_dict = grecon_model.optimize(in_dict)
+        pickle.dump(out_dict, open(out_file, 'wb'))
 
 print('ok')

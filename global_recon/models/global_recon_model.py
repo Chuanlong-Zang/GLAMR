@@ -643,8 +643,10 @@ class GlobalReconOptimizer:
         data['cam_pose_inv'] = data['cam_pose_inv'].detach()
         return data
 
-    def optimize(self, in_dict, continue_opt=False):
+    def optimize(self, in_dict, continue_opt=False, bo=False):
         data = tensor_to(in_dict, self.device) if continue_opt else self.init_data(in_dict)
+        if bo:  # before optimization, i.e. only motion infilling
+            return tensor_to_numpy(data)
 
         for stage, stage_specs in self.opt_stage_specs.items():
             opt_variables = stage_specs['opt_variables']

@@ -26,7 +26,7 @@ parser.add_argument('--cfg', default='glamr_dynamic')
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
 parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody_add_optimization')
 parser.add_argument('--gt_dir', default='dataset/egobody_preprocessed/test')
-parser.add_argument('--evl_num', default=5)   # 0 means all
+parser.add_argument('--evl_num', default=5)  # 0 means all
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--cached', type=int, default=1)
 parser.add_argument('--save_video', action='store_true', default=False)
@@ -42,6 +42,8 @@ else:
 data_split_df = pd.read_csv(os.path.join(args.dataset_root, 'data_splits.csv'))
 test_split_list = list(data_split_df['test'])
 conda_path = os.environ["CONDA_PREFIX"].split('/envs')[0]
+while np.nan in test_split_list:
+    test_split_list.remove(np.nan)
 
 
 def merge_results(file_list):
@@ -63,7 +65,8 @@ for i in tqdm.tqdm(range(args.evl_num)):
     print(f'Optimizing {recording_name}.')
 
     if not osp.exists(f'./PARE/logs/{recording_name}/PV_/pare_results'):
-        image_folder = os.path.join(glob.glob(os.path.join(args.dataset_root, 'egocentric_color', recording_name, '202*'))[0], 'PV')
+        image_folder = os.path.join(
+            glob.glob(os.path.join(args.dataset_root, 'egocentric_color', recording_name, '202*'))[0], 'PV')
         bbox_file = f'../dataset/egobody_preprocessed/test/{recording_name}.pkl'
         cmd = f'{conda_path}/envs/pare-env/bin/python scripts/detection_egobody.py --image_folder ../{image_folder} ' \
               f'--output_folder logs/{recording_name} --no_render --bbox_file {bbox_file}'
@@ -90,7 +93,8 @@ for i in tqdm.tqdm(range(args.evl_num)):
     seq_name = 'egobody'  # args.out_dir.split('/')[-1]
 
     out_file = f'{grecon_path}/{seq_name}_result.pkl'
-    if osp.exists(out_file):
+    out_file_bo = f'{grecon_path}/{seq_name}_result_bo.pkl'  # before_optimization
+    if osp.exists(out_file) and osp.exists(out_file_bo):
         print(f'{recording_name} already has been analysed!')
     else:
         os.makedirs(grecon_path, exist_ok=True)
@@ -100,7 +104,11 @@ for i in tqdm.tqdm(range(args.evl_num)):
         gt_result = joblib.load(gt_dir)
         in_dict = {'est': pare_results, 'gt': gt_result, 'gt_meta': dict(), 'seq_name': seq_name}
         grecon_model = model_dict[cfg.grecon_model_name](cfg, device, log)  # global recon model
-        out_dict = grecon_model.optimize(in_dict)
-        pickle.dump(out_dict, open(out_file, 'wb'))
+        if not osp.exists(out_file_bo):
+            out_dict = grecon_model.optimize(in_dict, bo=True)
+            pickle.dump(out_dict, open(out_file_bo, 'wb'))
+        if not osp.exists(out_file):
+            out_dict = grecon_model.optimize(in_dict, bo=False)
+            pickle.dump(out_dict, open(out_file, 'wb'))
 
 print('ok')

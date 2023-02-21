@@ -132,6 +132,26 @@ def traj_rot_smoothness_loss(data, specs):
     return loss_all
 
 
+def traj_rot_acceleration_loss(data, specs):
+    loss_all = 0
+    num_pose = 0
+    rot_type = specs.get('rot_type', '6d')
+    for pose_dict in data['person_data'].values():
+        num_pose += pose_dict['smpl_orient_world'].shape[0] - 1
+        if rot_type == '6d':
+            orient_6d = angle_axis_to_rot6d(pose_dict['smpl_orient_world'])
+            diff = orient_6d[1:] - orient_6d[:-1]
+            diff = diff[1:] - diff[:-1]
+        elif rot_type == 'quat':
+            quat = angle_axis_to_quaternion(pose_dict['smpl_orient_world'])
+            diff = quat_angle_diff(quat[1:], quat[:-1])
+            diff = diff[1:] - diff[:-1]
+        vel = diff * 30
+        loss_all += vel.pow(2).sum()
+    loss_all /= num_pose
+    return loss_all
+
+
 def traj_trans_smoothness_loss(data, specs):
     loss_all = 0
     num_pose = 0
@@ -143,6 +163,18 @@ def traj_trans_smoothness_loss(data, specs):
     loss_all /= num_pose
     return loss_all
 
+
+def traj_trans_acceleration_loss(data, specs):
+    loss_all = 0
+    num_pose = 0
+    for pose_dict in data['person_data'].values():
+        num_pose += pose_dict['root_trans_world'].shape[0] - 1
+        diff = pose_dict['root_trans_world'][1:] - pose_dict['root_trans_world'][:-1]
+        diff = diff[1:] - diff[:-1]
+        vel = diff * 30
+        loss_all += vel.pow(2).sum()
+    loss_all /= num_pose
+    return loss_all
 
 def cam_traj_rot_loss(data, specs):
     loss_all = 0
@@ -336,5 +368,7 @@ loss_func_dict = {
     'rel_transform': rel_transform_loss,
     'motion_latent_reg': motion_latent_reg_loss,
     'traj_latent_reg': traj_latent_reg_loss,
-    'penetration': penetration_loss
+    'penetration': penetration_loss,
+    'traj_tran_acceleration': traj_trans_acceleration_loss,
+    'traj_rot_acceleration': traj_rot_acceleration_loss,
 }

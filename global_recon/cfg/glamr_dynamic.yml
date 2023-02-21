@@ -19,7 +19,7 @@ opt_stage_specs:
   init_opt:
 
     opt_lr: 1.e-2
-    opt_niters: 500
+    opt_niters: 200
     opt_variables: ['world_res']
     # ['global_orient', 'global_trans']
     # ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
@@ -37,12 +37,21 @@ opt_stage_specs:
         min_conf: 0.3
         monitor_only: true
 
-      cam_traj_rot:
-        rot_type: 6d
-        weight: 1.e+5
+      # cam_traj_rot:
+      #   rot_type: 6d
+      #   weight: 1.e+5
 
-      traj_rot_smoothness:
-        weight: 1.e+3
+      # traj_rot_smoothness:
+      #   weight: 1.e+3
+
+      # traj_rot_acceleration:
+      #   weight: 1.e+3
+
+      # traj_tran_smoothness:
+      #   weight: 1.e+3
+
+      # traj_tran_acceleration:
+      #   weight: 1.e+3
 
       # reg loss
       # local_traj_dxy_reg:
@@ -68,7 +77,7 @@ opt_stage_specs:
   main_opt:
 
     opt_lr: 1.e-3
-    opt_niters: 500
+    opt_niters: 100
     opt_variables: ['world_res']
     # ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
 
@@ -85,12 +94,18 @@ opt_stage_specs:
         min_conf: 0.3
         monitor_only: true
 
-      cam_traj_rot:
-        rot_type: 6d
-        weight: 1.e+5
+      # cam_traj_rot:
+      #   rot_type: 6d
+      #   weight: 1.e+5
 
-      traj_rot_smoothness:
-        weight: 1.e+3
+      # traj_rot_smoothness:
+      #   weight: 1.e+3
+
+      # traj_tran_smoothness:
+      #   weight: 1.e+3
+
+      # traj_tran_acceleration:
+      #   weight: 1.e+3
 
       # reg loss
       # local_traj_dxy_reg:

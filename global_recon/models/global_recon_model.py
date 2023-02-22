@@ -745,7 +745,7 @@ class GlobalReconOptimizer:
 
     def calculate_gt_camera(self, new_dict, in_dict):
         dxyz = np.zeros_like(new_dict['root_trans_cam'].cpu())
-        vis_ind = np.where(new_dict['visible'])[0]
+        vis_ind = np.where(new_dict['visible'].cpu())[0]
         for i in vis_ind:
             dx, dy, dz = 0, 0, 0
             cx, cy, h, _ = in_dict['est']['bboxes'][i]

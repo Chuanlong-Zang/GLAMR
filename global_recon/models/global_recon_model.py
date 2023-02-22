@@ -206,7 +206,7 @@ class GlobalReconOptimizer:
             # get world pose
             if self.flag_gt_camera:
                 dxyz = self.calculate_gt_camera(new_dict, in_dict)
-                new_dict['root_trans_cam'] += dxyz
+                new_dict['root_trans_cam'] += torch.tensor(dxyz, device=self.device)
 
             new_dict['root_trans_world'] = transform_trans(cam_pose_inv, new_dict['root_trans_cam'])
             new_dict['smpl_orient_world'] = transform_rot(cam_pose_inv, new_dict['smpl_orient_cam'])

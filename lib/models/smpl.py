@@ -309,7 +309,8 @@ class SMPL(_SMPL):
         if root_trans is not None:
             if root_scale is None:
                 root_scale = torch.ones_like(root_trans[:, 0])
-            cur_root_trans = joints[:, [0], :]
+            root_idx = 8
+            cur_root_trans = joints[:, [root_idx], :]
             # rel_trans = (root_trans - joints[:, 0, :]).unsqueeze(1)
             output.vertices[:] = (output.vertices - cur_root_trans) * root_scale[:, None, None] + root_trans[:, None, :]
             output.joints[:] = (output.joints - cur_root_trans) * root_scale[:, None, None] + root_trans[:, None, :]

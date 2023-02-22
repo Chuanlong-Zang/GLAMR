@@ -369,6 +369,6 @@ loss_func_dict = {
     'motion_latent_reg': motion_latent_reg_loss,
     'traj_latent_reg': traj_latent_reg_loss,
     'penetration': penetration_loss,
-    'traj_tran_acceleration': traj_trans_acceleration_loss,
+    'traj_trans_acceleration': traj_trans_acceleration_loss,
     'traj_rot_acceleration': traj_rot_acceleration_loss,
 }

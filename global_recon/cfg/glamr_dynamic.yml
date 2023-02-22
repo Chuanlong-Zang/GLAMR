@@ -25,9 +25,9 @@ opt_stage_specs:
     # ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
 
     loss_cfg:
-      rel_transform:
-        trans_weight: 0.0
-        weight: 200
+      # rel_transform:
+      #   trans_weight: 0.0
+      #   weight: 200
 
       kp_2d:
         weight: 1.0
@@ -47,11 +47,10 @@ opt_stage_specs:
       # traj_rot_acceleration:
       #   weight: 1.e+3
 
-      # traj_tran_smoothness:
-      #   weight: 1.e+3
+      traj_trans_smoothness:
+        weight: 5.e+3
 
-      # traj_tran_acceleration:
-      #   weight: 1.e+3
+      # #   weight: 1.e+3
 
       # reg loss
       # local_traj_dxy_reg:
@@ -82,9 +81,9 @@ opt_stage_specs:
     # ['cam', 'local_xy', 'local_heading', 'world_dheading', 'local_rot']
 
     loss_cfg:
-      rel_transform:
-        trans_weight: 0.0
-        weight: 200
+      # rel_transform:
+      #   trans_weight: 0.0
+      #   weight: 200
 
       kp_2d:
         weight: 1.0
@@ -101,10 +100,13 @@ opt_stage_specs:
       # traj_rot_smoothness:
       #   weight: 1.e+3
 
-      # traj_tran_smoothness:
+      # traj_rot_acceleration:
       #   weight: 1.e+3
 
-      # traj_tran_acceleration:
+      traj_trans_smoothness:
+        weight: 5.e+3
+
+      # traj_trans_acceleration:
       #   weight: 1.e+3
 
       # reg loss

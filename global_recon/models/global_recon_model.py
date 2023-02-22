@@ -779,7 +779,7 @@ class GlobalReconOptimizer:
             # np.sum((dxyz_weighted - gt_trans) ** 2)
             dxyz[i] = dxyz_weighted
 
-        f = interp1d(vis_ind.astype(np.float32), dxyz[new_dict['visible'] == 1], axis=0, assume_sorted=True,
+        f = interp1d(vis_ind.astype(np.float32), dxyz[new_dict['visible'].cpu() == 1], axis=0, assume_sorted=True,
                      fill_value="extrapolate")
         dxyz_new = f(np.arange(new_dict['visible'].shape[0], dtype=np.float32))
         return dxyz_new

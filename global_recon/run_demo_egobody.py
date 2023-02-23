@@ -84,7 +84,8 @@ for i in tqdm.tqdm(range(args.evl_num)):
         pare_results = pickle.load(open(pare_results_path, 'rb'))
     else:
         pare_results = merge_results(pare_results)
-        pickle.dump(pare_results, open(pare_results_path, 'wb'))
+        with open(pare_results_path, 'wb') as f:
+            pickle.dump(pare_results, f)
 
     cfg.save_yml_file(f'{out_dir}/config.yml')
     log = create_logger(f'{out_dir}/log.txt')

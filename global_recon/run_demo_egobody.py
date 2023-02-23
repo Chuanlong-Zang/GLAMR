@@ -23,7 +23,7 @@ import time
 import tqdm
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--cfg', default='glamr_dynamic')
+parser.add_argument('--cfg', default='glamr_dynamic_original')
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
 parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody_add_optimization')
 parser.add_argument('--gt_dir', default='dataset/egobody_preprocessed/test')
@@ -34,6 +34,7 @@ parser.add_argument('--save_video', action='store_true', default=False)
 args = parser.parse_args()
 
 cfg = Config(args.cfg, out_dir=args.out_dir)
+cfg_name = args.cfg.split("_", 2)[-1]
 if torch.cuda.is_available() and args.gpu >= 0:
     device = torch.device('cuda', index=args.gpu)
     torch.cuda.set_device(args.gpu)
@@ -89,13 +90,13 @@ for i in tqdm.tqdm(range(args.evl_num)):
             pickle.dump(pare_results, f)
         time.sleep(5)  # make sure pickle is saving properly (for large files)
 
-    cfg.save_yml_file(f'{out_dir}/config.yml')
-    log = create_logger(f'{out_dir}/log.txt')
+    cfg.save_yml_file(f'{out_dir}/config_{cfg_name}.yml')
+    log = create_logger(f'{out_dir}/log_{cfg_name}.txt')
     grecon_path = f'{out_dir}/grecon'
     render_path = f'{out_dir}/grecon_videos'
     seq_name = 'egobody'  # args.out_dir.split('/')[-1]
 
-    out_file = f'{grecon_path}/{seq_name}_result.pkl'
+    out_file = f'{grecon_path}/{seq_name}_result_{cfg_name}.pkl'
     out_file_bo = f'{grecon_path}/{seq_name}_result_bo.pkl'  # before_optimization
     if osp.exists(out_file) and osp.exists(out_file_bo):
         print(f'{recording_name} already has been analysed!')

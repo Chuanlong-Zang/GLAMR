@@ -19,6 +19,7 @@ from pose_est.run_pose_est_demo import run_pose_est_on_video
 import joblib
 import pandas as pd
 import subprocess
+import time
 import tqdm
 
 parser = argparse.ArgumentParser()
@@ -86,6 +87,7 @@ for i in tqdm.tqdm(range(args.evl_num)):
         pare_results = merge_results(pare_results)
         with open(pare_results_path, 'wb') as f:
             pickle.dump(pare_results, f)
+        time.sleep(5)  # make sure pickle is saving properly (for large files)
 
     cfg.save_yml_file(f'{out_dir}/config.yml')
     log = create_logger(f'{out_dir}/log.txt')

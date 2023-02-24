@@ -23,9 +23,9 @@ import time
 import tqdm
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--cfg', default='glamr_dynamic_original')
+parser.add_argument('--cfg', default='glamr_dynamic_kp2d_tts+')
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
-parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody_add_optimization')
+parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody_joint_motion_infiller')
 parser.add_argument('--gt_dir', default='dataset/egobody_preprocessed/test')
 parser.add_argument('--evl_num', default=5)  # 0 means all
 parser.add_argument('--gpu', type=int, default=0)

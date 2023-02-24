@@ -60,6 +60,17 @@ def merge_results(file_list):
     return results
 
 
+def get_joint_visibility_smpl_order(results):
+    joint_visibility = np.ones(results['smpl_joints2d_smpl_order'].shape[:-1])
+    for i in range(results['smpl_joints2d_smpl_order'].shape[0]):
+        for j in range(results['smpl_joints2d_smpl_order'].shape[1]):
+            u, v = results['smpl_joints2d_smpl_order'][i, j]
+            if u <= 0 or u >= 1920 or v <= 0 or v >= 1080:
+                joint_visibility[i][j] = 0.0
+    results['vis_joints'] = joint_visibility
+    return results
+
+
 if args.evl_num == '0':
     args.evl_num = len(test_split_list)
 for i in tqdm.tqdm(range(args.evl_num)):
@@ -86,6 +97,8 @@ for i in tqdm.tqdm(range(args.evl_num)):
         pare_results = pickle.load(open(pare_results_path, 'rb'))
     else:
         pare_results = merge_results(pare_results)
+        if 'vis_joints' not in pare_results.keys():
+            pare_results = get_joint_visibility_smpl_order(pare_results)
         with open(pare_results_path, 'wb') as f:
             pickle.dump(pare_results, f)
         time.sleep(5)  # make sure pickle is saving properly (for large files)

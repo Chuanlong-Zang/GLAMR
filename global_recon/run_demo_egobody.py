@@ -23,7 +23,7 @@ import time
 import tqdm
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--cfg', default='glamr_dynamic_kp2d_tts+')
+parser.add_argument('--cfg', default='glamr_dynamic_kp2d_tts+_1')
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
 parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody_joint_motion_infiller')
 parser.add_argument('--gt_dir', default='dataset/egobody_preprocessed/test')
@@ -48,15 +48,17 @@ while np.nan in test_split_list:
     test_split_list.remove(np.nan)
 
 
-def merge_results(file_list):
+def merge_results(file_list, ignore_keys=None):
     results = dict()
     for i in range(len(file_list)):
         pare_result = joblib.load(file_list[i])
         if results:
             for key, value in pare_result.items():
-                results[key] = np.concatenate((results[key], value), axis=0)
+                if key not in ignore_keys:
+                    results[key] = np.concatenate((results[key], value), axis=0)
         else:
             results = pare_result.copy()
+    results = {k: v for k, v in results.items() if k not in ignore_keys}
     return results
 
 
@@ -96,11 +98,17 @@ for i in tqdm.tqdm(range(args.evl_num)):
     if osp.exists(pare_results_path):
         pare_results = pickle.load(open(pare_results_path, 'rb'))
     else:
-        pare_results = merge_results(pare_results)
+        ignore_keys = ['smpl_vertices', 'pred_segm_mask', 'smpl_feats', 'orig_cam']
+        pare_results = merge_results(pare_results, ignore_keys=ignore_keys)
         if 'vis_joints' not in pare_results.keys():
             pare_results = get_joint_visibility_smpl_order(pare_results)
-        with open(pare_results_path, 'wb') as f:
-            pickle.dump(pare_results, f)
+        try:
+            with open(pare_results_path, 'wb') as f:
+                pickle.dump(pare_results, f)
+        except OverflowError:
+            print(f'Recording {recording_name} occurs an overflow error, please consider reducing file size!')
+            with open(pare_results_path, 'wb') as f:
+                pickle.dump(pare_results, f, protocol=4)
         time.sleep(5)  # make sure pickle is saving properly (for large files)
 
     cfg.save_yml_file(f'{out_dir}/config_{cfg_name}.yml')
@@ -123,7 +131,7 @@ for i in tqdm.tqdm(range(args.evl_num)):
         grecon_model = model_dict[cfg.grecon_model_name](cfg, device, log)  # global recon model
         if not osp.exists(out_file_bo):
             out_dict = grecon_model.optimize(in_dict, bo=True)
-            pickle.dump(out_dict, open(out_file_bo, 'wb'))
+            pickle.dump(out_dict, open(out_file_bo, 'wb'))  # no need to use protocol 4 since file size X MB
         if not osp.exists(out_file):
             out_dict = grecon_model.optimize(in_dict, bo=False)
             pickle.dump(out_dict, open(out_file, 'wb'))

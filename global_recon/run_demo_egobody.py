@@ -23,7 +23,7 @@ import time
 import tqdm
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--cfg', default='glamr_dynamic_kp2d_tts+')
+parser.add_argument('--cfg', default='glamr_dynamic_kp2d_tts+_1')
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
 parser.add_argument('--out_dir', default='out/glamr_dynamic/egobody_joint_motion_infiller')
 parser.add_argument('--gt_dir', default='dataset/egobody_preprocessed/test')
@@ -118,7 +118,7 @@ for i in tqdm.tqdm(range(args.evl_num)):
     seq_name = 'egobody'  # args.out_dir.split('/')[-1]
 
     out_file = f'{grecon_path}/{seq_name}_result_{cfg_name}.pkl'
-    out_file_bo = f'{grecon_path}/{seq_name}_result_bo.pkl'  # before_optimization
+    out_file_bo = f'{grecon_path}/{seq_name}_result_{cfg_name}_bo.pkl'  # before_optimization
     if osp.exists(out_file) and osp.exists(out_file_bo):
         print(f'{recording_name} already has been analysed!')
     else:

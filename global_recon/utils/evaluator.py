@@ -6,7 +6,7 @@ from collections import defaultdict
 from lib.utils.konia_transform import rotation_matrix_to_angle_axis
 from lib.utils.torch_transform import batch_compute_similarity_transform_torch, angle_axis_to_quaternion, quat_angle_diff, quaternion_to_angle_axis, quat_mul, quat_apply, inverse_transform, make_transform
 from lib.utils.torch_utils import tensor_to
-from lib.utils.logging import create_logger
+from lib.utils.log_utils import create_logger
 from lib.utils.tools import AverageMeter, concat_lists, find_consecutive_runs
 from lib.models.smpl import H36M_TO_J15, SMPL, SMPL_MODEL_DIR, JOINT_REGRESSOR_H36M
 from traj_pred.utils.traj_utils import convert_traj_world2heading

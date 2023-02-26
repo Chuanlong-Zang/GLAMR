@@ -165,7 +165,7 @@ class GlobalReconOptimizer:
             new_dict['frames'] = np.arange(max_len)
             new_dict['vis_frames'] = vis_frames = visible == 1
             new_dict['invis_frames'] = invis_frames = visible == 0
-            # new_dict['vis_joints'] = in_dict['est']['vis_joints']
+            new_dict['vis_joints'] = in_dict['est']['vis_joints']
             new_dict['frame2ind'] = {f: i for i, f in enumerate(new_dict['frames'])}
             new_dict['scale'] = None
             smpl_pose_wroot = rotation_matrix_to_angle_axis(
@@ -431,7 +431,7 @@ class GlobalReconOptimizer:
             batch = {
                 'in_body_pose': pose_dict['smpl_pose_nofill'][exist_fr].unsqueeze(0).clone(),
                 'frame_mask': pose_dict['visible'][exist_fr].unsqueeze(0).clone(),
-                # 'joint_mask': pose_dict['vis_joints'][exist_fr].unsqueeze(0).clone()
+                'joint_mask': pose_dict['vis_joints'][exist_fr].unsqueeze(0).clone()
             }
             if self.mt_model.traj_predictor is not None and self.mt_model.traj_predictor.in_joint_pos_only:
                 batch['shape'] = pose_dict['smpl_beta'][exist_fr].unsqueeze(0)

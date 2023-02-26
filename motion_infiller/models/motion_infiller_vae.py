@@ -39,6 +39,7 @@ class ContextEncoder(nn.Module):
         self.use_jvel = specs.get('use_jvel', False)
         self.pose_rep = ctx['pose_rep']
         self.rot_type = specs.get('rot_type', 'axis_angle')
+        self.use_num = cfg.model_specs.get('version_num', 0)
         assert self.rot_type in {'axis_angle', '6d'}
         pose_dim = (69 if self.pose_rep == 'body' else 72) * (2 if self.rot_type == '6d' else 1)
         if self.use_jpos:
@@ -113,7 +114,14 @@ class ContextEncoder(nn.Module):
             x = self.in_fc(x)
 
         x = self.pos_enc(x)
-        x = self.temporal_net(x, src_key_padding_mask=data['vis_frame_mask'])             
+
+        if self.use_num == 0:
+            x = self.temporal_net(x, src_key_padding_mask=data['vis_frame_mask'])
+        elif self.use_num == 1:
+            x = x.expand((-1, 24, -1))  # 24 SMPL joints -> 50, 24, 256 (seq_len, batch_size, hidd_dim)
+            x = self.temporal_net(x, src_key_padding_mask=data['vis_joint_mask'].squeeze(0).T)
+            # x: 50,24,256 mask: 24,50
+            x = x.mean(dim=1, keepdim=True)
 
         if self.out_mlp is not None:
             x = self.out_mlp(x)
@@ -495,6 +503,9 @@ class MotionInfillerVAE(pl.LightningModule):
     def init_batch_data(self, batch):
         data = batch.copy()
         # frame mask to be used by transformers
+        data['invis_joint_mask'] = data['joint_mask'] == 1  # invisble frames are marked as False
+        data['vis_joint_mask'] = ~data['invis_joint_mask']
+
         data['invis_frame_mask'] = data['frame_mask'] == 1     # invisble frames are marked as False
         data['vis_frame_mask'] = ~data['invis_frame_mask']
         frame_mask = data['frame_mask'].transpose(0, 1).unsqueeze(-1)
@@ -584,6 +595,14 @@ class MotionInfillerVAE(pl.LightningModule):
             pad = torch.ones(data[key].shape[:-1] + (pad_len,), device=data[key].device, dtype=data[key].dtype)
             data_i[key] = torch.cat([data_i[key], pad], dim=1)
 
+        keys = ['vis_joint_mask']  # 3 dim
+        for key in keys:
+            data_i[key] = data[key][:, sind: eind_b].clone()
+            if pad_len > 0:
+                pad = torch.ones(data[key].shape[:1] + (pad_len, data[key].shape[-1]), device=data[key].device,
+                                dtype=data[key].dtype)
+                data_i[key] = torch.cat([data_i[key], pad], dim=1)
+
         return data_i
 
     def get_res_from_cur_data(self, data, cur_data, sind, eind, recon):
@@ -627,6 +646,7 @@ class MotionInfillerVAE(pl.LightningModule):
             eind = i * cur_nframe + window_len
             data_i = self.get_seg_data(data, i, sind, eind)
             data_i['vis_frame_mask'][:, :self.past_nframe] = False
+            data_i['vis_joint_mask'][:, :self.past_nframe, :] = False
             self.inference_one_step(data_i, sample_num, recon)
             self.get_res_from_cur_data(data, data_i, sind, eind, recon)
         return data

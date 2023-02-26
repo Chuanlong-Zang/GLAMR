@@ -23,6 +23,7 @@ parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
 parser.add_argument('--preprocess_out_dir', default='dataset/egobody_pare_predicts')
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--cached', type=int, default=1)
+parser.add_argument('--split', default='all')  # all means train + val
 parser.add_argument('--save_video', action='store_true', default=False)
 args = parser.parse_args()
 
@@ -65,9 +66,17 @@ def get_joint_visibility_smpl_order(results):
     results['vis_joints'] = joint_visibility
     return results
 
+period_dict = {}
+if args.split == 'train':
+    period_dict = {'train': train_split_list}
+elif args.split == 'val':
+    period_dict = {'val': val_split_list}
+elif args.split == 'all':
+    period_dict = {'train': train_split_list,
+                   'val': val_split_list}
+else:
+    print('Not recognized split!')
 
-period_dict = {'train': train_split_list,
-               'val': val_split_list}
 for period, recording_list in period_dict.items():
     recording_num = len(recording_list)
 

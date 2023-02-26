@@ -24,7 +24,6 @@ parser.add_argument('--preprocess_out_dir', default='dataset/egobody_pare_predic
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--cached', type=int, default=1)
 parser.add_argument('--split', default='all')  # all means train + val
-parser.add_argument('--save_video', action='store_true', default=False)
 args = parser.parse_args()
 
 if torch.cuda.is_available() and args.gpu >= 0:

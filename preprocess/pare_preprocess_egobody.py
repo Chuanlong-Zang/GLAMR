@@ -24,6 +24,7 @@ parser.add_argument('--preprocess_out_dir', default='dataset/egobody_pare_predic
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--cached', type=int, default=1)
 parser.add_argument('--split', default='all')  # all means train + val
+parser.add_argument('--from_to_index', default='0-0')  # for parallel jobs in slurm
 args = parser.parse_args()
 
 if torch.cuda.is_available() and args.gpu >= 0:
@@ -75,6 +76,12 @@ elif args.split == 'all':
                    'val': val_split_list}
 else:
     print('Not recognized split!')
+
+from_index, to_index = map(int, args.from_to_index.split('-'))
+if from_index == 0 and to_index == 0:
+    period_dict = period_dict
+else:
+    period_dict = {k: v[from_index: to_index] for k, v in period_dict.items()}
 
 for period, recording_list in period_dict.items():
     recording_num = len(recording_list)

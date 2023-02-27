@@ -81,7 +81,7 @@ from_index, to_index = map(int, args.from_to_index.split('-'))
 if from_index == 0 and to_index == 0:
     period_dict = period_dict
 else:
-    period_dict = {k: v[from_index: to_index] for k, v in period_dict.items()}
+    period_dict = {k: v[from_index: to_index+1] for k, v in period_dict.items()}
 
 for period, recording_list in period_dict.items():
     recording_num = len(recording_list)

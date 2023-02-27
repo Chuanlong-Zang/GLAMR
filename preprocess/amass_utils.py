@@ -20,10 +20,13 @@ def read_data(folder, sequences, fps=30, smpl=None, device=torch.device('cpu')):
     joint_pos_dict = {}
 
     for seq_name in sequences:
-        print(f'Reading {seq_name} sequence...')
-        seq_folder = osp.join(folder, seq_name)
+        try:
+            print(f'Reading {seq_name} sequence...')
+            seq_folder = osp.join(folder, seq_name)
 
-        read_sequence(seq_folder, seq_name, theta_dict, joint_pos_dict, fps, smpl, device)
+            read_sequence(seq_folder, seq_name, theta_dict, joint_pos_dict, fps, smpl, device)
+        except:
+            pass
 
     return theta_dict, joint_pos_dict
 

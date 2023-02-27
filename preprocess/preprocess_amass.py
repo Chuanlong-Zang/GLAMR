@@ -11,8 +11,8 @@ from amass_utils import read_data
 from lib.models.smpl import SMPL, SMPL_MODEL_DIR
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', default='datasets/amass')
-parser.add_argument('--output_path', default='datasets/amass_processed/v1_new')
+parser.add_argument('--data_path', default='dataset/amass')
+parser.add_argument('--output_path', default='dataset/amass_processed/v1_new')
 parser.add_argument('--video', action='store_true', default=False)
 args = parser.parse_args()
 
@@ -54,16 +54,23 @@ amass_splits = {
 }
 
 
-device = torch.device('cuda')
+if torch.cuda.is_available():
+    device = torch.device('cuda', index=args.gpu)
+    torch.cuda.set_device(args.gpu)
+else:
+    device = torch.device('cpu')
 smpl = SMPL(SMPL_MODEL_DIR, pose_type='body26fk', create_transl=False).to(device)
 
 for split in ['test', 'train']:
-    theta_data, jpos_data = read_data(amass_dir, sequences=amass_splits[split], smpl=smpl, device=device)
+    try:
+        theta_data, jpos_data = read_data(amass_dir, sequences=amass_splits[split], smpl=smpl, device=device)
 
-    theta_data_file = osp.join(processed_dir, f'amass_{split}.pkl')
-    print(f'Saving AMASS dataset (theta) to {theta_data_file}')
-    pickle.dump(theta_data, open(theta_data_file, 'wb'))
+        theta_data_file = osp.join(processed_dir, f'amass_{split}.pkl')
+        print(f'Saving AMASS dataset (theta) to {theta_data_file}')
+        pickle.dump(theta_data, open(theta_data_file, 'wb'))
 
-    jpos_data_file = osp.join(processed_dir, f'amass_{split}_jpos.pkl')
-    print(f'Saving AMASS dataset (joint pos) to {jpos_data_file}')
-    pickle.dump(jpos_data, open(jpos_data_file, 'wb'))
+        jpos_data_file = osp.join(processed_dir, f'amass_{split}_jpos.pkl')
+        print(f'Saving AMASS dataset (joint pos) to {jpos_data_file}')
+        pickle.dump(jpos_data, open(jpos_data_file, 'wb'))
+    except:
+        pass

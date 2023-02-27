@@ -117,9 +117,9 @@ if __name__ == "__main__":
 
     np.random.seed(0)
     torch.manual_seed(0)
-    amass_dir = 'datasets/amass_processed/v1'
+    amass_dir = 'dataset/amass_processed/v1_new'
 
-    dataset = AMASSDataset(amass_dir, 'test', seq_len=200)
+    dataset = AMASSDataset(amass_dir, 'train', seq_len=200)
     print(f'dataset has {len(dataset)} data')
 
     batch_size = 5

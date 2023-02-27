@@ -30,6 +30,7 @@ parser.add_argument('--max_epochs', type=int, default=None)
 parser.add_argument('--save_n_epochs', type=int, default=None)
 parser.add_argument('--debug', action='store_true', default=False)
 parser.add_argument('--resume', action='store_true', default=False)
+parser.add_argument('--first_n', type=int, default=0)
 parser.add_argument('--version', type=int, default=None)
 parser.add_argument('--cp', default='last')
 parser.add_argument('--profiler', default=None)
@@ -54,12 +55,14 @@ torch.set_default_dtype(torch.float32)
 
 # train datasets
 train_dataset = EgobodyDataset(cfg.egobody_dataset_dir, cfg.egobody_pare_predict_dir, cfg.egobody_preprocessed_dir,
-                               'train', cfg, seq_len=cfg.seq_len, ntime_per_epoch=cfg.train_ntime_per_epoch, first_n=4)
+                               'train', cfg, seq_len=cfg.seq_len,
+                               ntime_per_epoch=cfg.train_ntime_per_epoch, first_n=args.first_n)
 train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, num_workers=args.nworkers, pin_memory=True,
                               worker_init_fn=worker_init_fn, drop_last=True)
 # val datasets
 val_dataset = EgobodyDataset(cfg.egobody_dataset_dir, cfg.egobody_pare_predict_dir, cfg.egobody_preprocessed_dir,
-                               'test', cfg, seq_len=cfg.seq_len, ntime_per_epoch=cfg.train_ntime_per_epoch, first_n=2)
+                               'test', cfg, seq_len=cfg.seq_len,
+                             ntime_per_epoch=cfg.train_ntime_per_epoch, first_n=args.first_n)
 val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, num_workers=args.nworkers, pin_memory=True,
                             worker_init_fn=worker_init_fn, drop_last=True)
 # model

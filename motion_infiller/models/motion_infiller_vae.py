@@ -69,7 +69,11 @@ class ContextEncoder(nn.Module):
         max_freq = pe_cfg.get('max_freq', 10)
         freq_scale = pe_cfg.get('freq_scale', 0.1)
         concat = pe_cfg.get('concat', True)
-        self.pos_enc = PositionalEncoding(temporal_cfg['model_dim'], cur_dim, pe_cfg['enc_type'], max_freq, freq_scale, concat=concat)
+        if self.use_num == 2:
+            self.pos_enc = PositionalEncoding(temporal_cfg['tp_enc_dim'], cur_dim, pe_cfg['enc_type'], max_freq,
+                                              freq_scale, concat=concat, use_num=self.use_num)
+        else:
+            self.pos_enc = PositionalEncoding(temporal_cfg['model_dim'], cur_dim, pe_cfg['enc_type'], max_freq, freq_scale, concat=concat, use_num=self.use_num)
         # transformer
         tf_layers = nn.TransformerEncoderLayer(temporal_cfg['model_dim'], temporal_cfg['nhead'], temporal_cfg['ff_dim'], temporal_cfg['dropout'])
         self.temporal_net = nn.TransformerEncoder(tf_layers, temporal_cfg['nlayer'])
@@ -91,37 +95,58 @@ class ContextEncoder(nn.Module):
         ctx['context_dim'] = cur_dim
 
     def forward(self, data):
-        x_in = data['in_body_pose_tp'] if self.pose_rep == 'body' else data['in_pose_tp']
-        if self.rot_type == '6d':
-            aa = x_in.view(x_in.shape[:-1] + (-1, 3))
-            sixd = angle_axis_to_rot6d(aa)
-            x_in = sixd.view(x_in.shape[:-1] + (-1,))
+        if self.use_num != 2:
+            x_in = data['in_body_pose_tp'] if self.pose_rep == 'body' else data['in_pose_tp']
+            if self.rot_type == '6d':
+                aa = x_in.view(x_in.shape[:-1] + (-1, 3))
+                sixd = angle_axis_to_rot6d(aa)
+                x_in = sixd.view(x_in.shape[:-1] + (-1,))
 
-        if self.use_jpos:
-            x_in = torch.cat([x_in, data['in_joint_pos_tp']], dim=-1)
-        if self.use_jvel:
-            x_in = torch.cat([x_in, data['in_joint_vel_tp']], dim=-1)
+            if self.use_jpos:
+                x_in = torch.cat([x_in, data['in_joint_pos_tp']], dim=-1)
+            if self.use_jvel:
+                x_in = torch.cat([x_in, data['in_joint_vel_tp']], dim=-1)
 
-        data['x_in'] = x_in
+            data['x_in'] = x_in
 
-        if self.training and self.input_noise is not None:
-            x_in += torch.randn_like(x_in) * self.input_noise
-        
-        x = x_in
-        if self.in_mlp is not None:
-            x = self.in_mlp(x)
-        if self.in_fc is not None:
-            x = self.in_fc(x)
+            if self.training and self.input_noise is not None:
+                x_in += torch.randn_like(x_in) * self.input_noise
+
+            x = x_in
+            if self.in_mlp is not None:
+                x = self.in_mlp(x)
+            if self.in_fc is not None:
+                x = self.in_fc(x)
+        else:
+            if len(data['point_local_feat'].shape) == 4:
+                # during training: bs, seq_len, embedding_dim, 24 joints -> embedding_dim, seq_len, bs * 24
+                batch_size, seq_len, embedding_dim, n_joints = data['point_local_feat'].size()
+                x = data['point_local_feat'].permute(1, 0, 3, 2)  # bsen -> sbne
+                x = x.reshape(x.shape[0], -1, x.shape[-1])  # sbne -> s(bn)e
+            else:
+                x = data['point_local_feat'].permute(1, 2, 0)  # x: training: 1024, 50, 128, 24 - testing: 50, 24, 128
+            try:
+                data['x_in'] = data['in_body_pose_tp']  # TODO: change decoder part to be feature, not pose
+            except:
+                pass
 
         x = self.pos_enc(x)
 
         if self.use_num == 0:
             x = self.temporal_net(x, src_key_padding_mask=data['vis_frame_mask'])
-        elif self.use_num == 1:
-            x = x.expand((-1, 24, -1))  # 24 SMPL joints -> 50, 24, 256 (seq_len, batch_size, hidd_dim)
-            x = self.temporal_net(x, src_key_padding_mask=data['vis_joint_mask'].squeeze(0).T)
-            # x: 50,24,256 mask: 24,50
-            x = x.mean(dim=1, keepdim=True)
+        elif self.use_num in [1, 2]:
+            if self.use_num == 1:
+                x = x.expand((-1, 24, -1))  # 24 SMPL joints -> 50, 24, 256 (seq_len, batch_size, hidd_dim)
+            if len(data['point_local_feat'].shape) == 4:  # training
+                joint_mask = data['vis_joint_mask'].permute(0, 2, 1)
+                joint_mask = joint_mask.reshape(-1, joint_mask.shape[-1])
+                x = self.temporal_net(x, src_key_padding_mask=joint_mask)
+                x = x.reshape(x.shape[0], batch_size, n_joints, x.shape[-1])
+                x = torch.nanmean(x, 2)  # There could be some joints keeping invisible within these seq, results nan
+            else:
+                x = self.temporal_net(x, src_key_padding_mask=data['vis_joint_mask'].squeeze(0).T)
+                # x: 50,24,256 mask: 24,50
+                x = x.mean(dim=1, keepdim=True)
 
         if self.out_mlp is not None:
             x = self.out_mlp(x)
@@ -154,6 +179,7 @@ class DataEncoder(nn.Module):
         self.use_jvel = specs.get('use_jvel', False)
         self.pose_rep = ctx['pose_rep']
         self.rot_type = specs.get('rot_type', 'axis_angle')
+        self.use_num = cfg.model_specs.get('version_num', 0)
         assert self.rot_type in {'axis_angle', '6d'}
         pose_dim = (69 if self.pose_rep == 'body' else 72) * (2 if self.rot_type == '6d' else 1)
         if self.use_jpos:
@@ -183,7 +209,14 @@ class DataEncoder(nn.Module):
         freq_scale = pe_cfg.get('freq_scale', 0.1)
         concat = pe_cfg.get('concat', True)
         learnable_pos_index = pe_cfg.get('learnable_pos_index', None)
-        self.pos_enc = PositionalEncoding(temporal_cfg['model_dim'], cur_dim, pe_cfg['enc_type'], max_freq, freq_scale, concat=concat, learnable_pos_index=learnable_pos_index)
+        if self.use_num == 2:
+            self.pos_enc = PositionalEncoding(temporal_cfg['tp_enc_dim'], cur_dim, pe_cfg['enc_type'], max_freq,
+                                              freq_scale, concat=concat, use_num=self.use_num
+                                              , learnable_pos_index=learnable_pos_index)
+        else:
+            self.pos_enc = PositionalEncoding(temporal_cfg['model_dim'], cur_dim, pe_cfg['enc_type'], max_freq,
+                                              freq_scale, concat=concat, learnable_pos_index=learnable_pos_index)
+
         # transformer
         tf_layers = nn.TransformerDecoderLayer(temporal_cfg['model_dim'], temporal_cfg['nhead'], temporal_cfg['ff_dim'], temporal_cfg['dropout'])
         self.temporal_net = nn.TransformerDecoder(tf_layers, temporal_cfg['nlayer'])
@@ -211,31 +244,36 @@ class DataEncoder(nn.Module):
 
     def forward(self, data):
         context = data['context']
-        x_in = data['body_pose_tp'] if self.pose_rep == 'body' else data['pose_tp']
-        x_in = x_in[self.past_nframe:-self.fut_nframe]
-        if self.rot_type == '6d':
-            aa = x_in.view(x_in.shape[:-1] + (-1, 3))
-            sixd = angle_axis_to_rot6d(aa)
-            x_in = sixd.view(x_in.shape[:-1] + (-1,))
+        if self.use_num != 2:
+            x_in = data['body_pose_tp'] if self.pose_rep == 'body' else data['pose_tp']
+            x_in = x_in[self.past_nframe:-self.fut_nframe]
+            if self.rot_type == '6d':
+                aa = x_in.view(x_in.shape[:-1] + (-1, 3))
+                sixd = angle_axis_to_rot6d(aa)
+                x_in = sixd.view(x_in.shape[:-1] + (-1,))
 
-        if self.masked_pose_only:
-            x_in *= 1 - data['pose_mask_tp'][self.past_nframe:-self.fut_nframe]
+            if self.masked_pose_only:
+                x_in *= 1 - data['pose_mask_tp'][self.past_nframe:-self.fut_nframe]
 
-        if self.use_jpos:
-            x_in = torch.cat([x_in, data['joint_pos_tp'][self.past_nframe:-self.fut_nframe]], dim=-1)
-        if self.use_jvel:
-            x_in = torch.cat([x_in, data['joint_vel_tp'][self.past_nframe:-self.fut_nframe]], dim=-1)
+            if self.use_jpos:
+                x_in = torch.cat([x_in, data['joint_pos_tp'][self.past_nframe:-self.fut_nframe]], dim=-1)
+            if self.use_jvel:
+                x_in = torch.cat([x_in, data['joint_vel_tp'][self.past_nframe:-self.fut_nframe]], dim=-1)
 
-        x = x_in
-        if self.in_mlp is not None:
-            x = self.in_mlp(x)
-        if self.in_fc is not None:
-            x = self.in_fc(x)
+            x = x_in
+            if self.in_mlp is not None:
+                x = self.in_mlp(x)
+            if self.in_fc is not None:
+                x = self.in_fc(x)
+        else:
+            x = context
 
         if self.pooling == 'attn':
-            x = torch.cat([self.mu_token.repeat(1, x.shape[1], 1), self.logvar_token.repeat(1, x.shape[1], 1), x], dim=0)
-            x = self.pos_enc(x)
-            x = self.temporal_net(x, context, memory_key_padding_mask=data['vis_frame_mask'])
+            if self.use_num != 2:
+                x = torch.cat([self.mu_token.repeat(1, x.shape[1], 1), self.logvar_token.repeat(1, x.shape[1], 1), x], dim=0)
+                x = self.pos_enc(x)
+                x = self.temporal_net(x, context, memory_key_padding_mask=data['vis_frame_mask'])
+
             mu = self.q_z_mu_net(x[0])
             logvar = self.q_z_logvar_net(x[1])
             data['q_z_dist'] = Normal(mu=mu, logvar=logvar)
@@ -281,6 +319,7 @@ class DataDecoder(nn.Module):
         self.use_jvel = specs.get('use_jvel', False)
         self.pose_rep = ctx['pose_rep']
         self.rot_type = specs.get('rot_type', 'axis_angle')
+        self.use_num = cfg.model_specs.get('version_num', 0)
         assert self.rot_type in {'axis_angle', '6d'}
         pose_dim = (69 if self.pose_rep == 'body' else 72) * (2 if self.rot_type == '6d' else 1)
         if self.use_jpos:
@@ -403,7 +442,10 @@ class DataDecoder(nn.Module):
         x = self.out_fc(x)
 
         if not self.pred_past:
-            x = torch.cat([data['x_in'][:self.past_nframe].repeat_interleave(sample_num, dim=1), x], dim=0)
+            try:
+                x = torch.cat([data['x_in'][:self.past_nframe].repeat_interleave(sample_num, dim=1), x], dim=0)
+            except:
+                x = torch.cat([data['pose_gt_tp'][:self.past_nframe].repeat_interleave(sample_num, dim=1), x], dim=0)
             
         x_all = x.view(-1, data['batch_size'], sample_num, x.shape[-1])
 
@@ -420,7 +462,11 @@ class DataDecoder(nn.Module):
              
         if self.pose_rep == 'body':
             data[f'{mode}_out_body_pose_tp'] = x
-            root_rot = data['pose_tp'][:-self.fut_nframe, :, :3] if 'pose_tp' in data else torch.zeros_like(data['in_body_pose_tp'][:-self.fut_nframe, :, :3])
+            try:
+                root_rot = data['pose_tp'][:-self.fut_nframe, :, :3] if 'pose_tp' in data else \
+                    torch.zeros_like(data['in_body_pose_tp'][:-self.fut_nframe, :, :3])
+            except:
+                root_rot = torch.zeros_like(data['train_out_body_pose_tp'][:, :, :3])
             if mode == 'infer':
                 root_rot = root_rot.unsqueeze(2).repeat((1, 1, sample_num, 1))
             data[f'{mode}_out_pose_tp'] = torch.cat((root_rot, data[f'{mode}_out_body_pose_tp']), dim=-1)
@@ -535,7 +581,11 @@ class MotionInfillerVAE(pl.LightningModule):
             data['in_pose_tp'] = data['in_pose'].transpose(0, 1).contiguous()
         # in_body_pose
         if 'in_body_pose' not in data:
-            data['in_body_pose_tp'] = data['in_pose_tp'][..., 3:]
+            try:
+                data['in_body_pose_tp'] = data['in_pose_tp'][..., 3:]
+            except:
+                data['pose_gt_tp'] = data['pose_gt'][...,3:].transpose(0, 1).contiguous()
+                pass
         else:
             data['in_body_pose_tp'] = data['in_body_pose'].transpose(0, 1).contiguous()
         # pose dropout
@@ -555,8 +605,13 @@ class MotionInfillerVAE(pl.LightningModule):
                 data['in_joint_vel_tp'] = torch.cat([data['in_joint_vel_tp'][[0]], data['in_joint_vel_tp']], dim=0)
             data['in_joint_pos_tp'] *= frame_mask
             data['in_joint_vel_tp'] *= frame_mask
-        data['batch_size'] = data['in_body_pose_tp'].shape[1]
-        data['seq_len'] = data['in_body_pose_tp'].shape[0]
+
+        if 'in_body_pose_tp' in data.keys():
+            data['batch_size'] = data['in_body_pose_tp'].shape[1]
+            data['seq_len'] = data['in_body_pose_tp'].shape[0]
+        else:
+            data['batch_size'] = data['frame_loss_mask_tp'].shape[1]
+            data['seq_len'] = data['frame_loss_mask_tp'].shape[0]
         return data
 
     def inference_one_step(self, data, sample_num, recon):
@@ -595,7 +650,7 @@ class MotionInfillerVAE(pl.LightningModule):
             pad = torch.ones(data[key].shape[:-1] + (pad_len,), device=data[key].device, dtype=data[key].dtype)
             data_i[key] = torch.cat([data_i[key], pad], dim=1)
 
-        keys = ['vis_joint_mask']  # 3 dim
+        keys = ['vis_joint_mask', 'point_local_feat']  # 3 dim
         for key in keys:
             data_i[key] = data[key][:, sind: eind_b].clone()
             if pad_len > 0:

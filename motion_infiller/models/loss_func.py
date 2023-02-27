@@ -11,7 +11,10 @@ def compute_mse(data, specs):
     key = 'body_pose' if specs.get('body_only', False) else 'pose'
     vis_only = specs.get('vis_only', False)
     num_fr = data[f'train_out_{key}_tp'].shape[0]
-    diff = data[f'train_out_{key}_tp'] - data[f'{key}_tp'][:num_fr]
+    try:
+        diff = data[f'train_out_{key}_tp'] - data[f'{key}_tp'][:num_fr]
+    except:
+        diff = data[f'train_out_{key}_tp'] - data['pose_gt_tp'][:num_fr]
     # diff *= data['frame_loss_mask_tp'][:num_fr]
     dist = diff.pow(2).sum(-1)
     if vis_only:

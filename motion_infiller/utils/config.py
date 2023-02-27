@@ -36,7 +36,15 @@ class Config:
         self.gradient_clip_val = yml_dict.get('gradient_clip_val', 0.0)
 
         # dataset
-        self.amass_dir = yml_dict['amass_dir']
+        self.dataset = yml_dict.get('dataset', 'amass')
+        if self.dataset == 'amass':
+            self.amass_dir = yml_dict['amass_dir']
+        elif self.dataset == 'egobody':
+            self.egobody_dataset_dir = yml_dict['egobody_dataset_dir']
+            self.egobody_pare_predict_dir = yml_dict['egobody_pare_predict_dir']
+            self.egobody_preprocessed_dir = yml_dict['egobody_preprocessed_dir']
+        else:
+            raise NotImplementedError
         self.max_epochs = sci_to_int(yml_dict.get('max_epochs', 20))
         self.save_n_epochs = sci_to_int(yml_dict.get('save_n_epochs', 1))
         self.train_ntime_per_epoch = sci_to_int(yml_dict.get('train_ntime_per_epoch', 1e3))

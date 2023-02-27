@@ -5,7 +5,7 @@ from torch import nn
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, enc_dim, in_dim=None, enc_type='fourier', max_freq=10, freq_scale=1.0, dropout=None, concat=True, learnable_pos_index=None):
+    def __init__(self, enc_dim, in_dim=None, enc_type='fourier', max_freq=10, freq_scale=1.0, dropout=None, concat=True, learnable_pos_index=None, use_num=0):
         super(PositionalEncoding, self).__init__()
         self.enc_dim = enc_dim
         self.in_dim = enc_dim if in_dim is None else in_dim
@@ -14,8 +14,12 @@ class PositionalEncoding(nn.Module):
         self.freq_scale = freq_scale
         self.concat = concat
         self.dropout = nn.Dropout(p=dropout) if dropout is not None else None
+        self.use_num = use_num
         if concat:
-            self.fc = nn.Linear(self.enc_dim + self.in_dim, self.enc_dim)
+            if self.use_num != 2:
+                self.fc = nn.Linear(self.enc_dim + self.in_dim, self.enc_dim)
+            else:
+                self.fc = None
         if learnable_pos_index is not None:
             if not isinstance(learnable_pos_index, torch.Tensor):
                 learnable_pos_index = torch.LongTensor(learnable_pos_index)
@@ -71,7 +75,10 @@ class PositionalEncoding(nn.Module):
             if self.concat:
                 pe_exp = pe.expand(x_shape[:-1] + (self.enc_dim,))
                 x = torch.cat([x, pe_exp], dim=-1)
-                x = self.fc(x)
+                if self.use_num == 2:
+                    x = x
+                else:
+                    x = self.fc(x)
             else:
                 x = x + pe
         else:

@@ -140,7 +140,14 @@ class ContextEncoder(nn.Module):
             if len(data['point_local_feat'].shape) == 4:  # training
                 joint_mask = data['vis_joint_mask'].permute(0, 2, 1)
                 joint_mask = joint_mask.reshape(-1, joint_mask.shape[-1])
-                x = self.temporal_net(x, src_key_padding_mask=joint_mask)
+
+                all_invisible_joints = torch.all(joint_mask, dim=1)
+                x_out = torch.empty_like(x)
+                x_out[...] = torch.nan
+                x = self.temporal_net(x[:, ~all_invisible_joints, :],
+                                      src_key_padding_mask=joint_mask[~all_invisible_joints])
+                x_out[:, ~all_invisible_joints, :] = x
+                x = x_out
                 x = x.reshape(x.shape[0], batch_size, n_joints, x.shape[-1])
                 x = torch.nanmean(x, 2)  # There could be some joints keeping invisible within these seq, results nan
             else:

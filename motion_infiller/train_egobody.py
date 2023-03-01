@@ -73,6 +73,8 @@ if __name__ == '__main__':
                                  , random=args.random_dataset)
     val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, num_workers=args.nworkers, pin_memory=True,
                                 worker_init_fn=worker_init_fn, drop_last=True)
+    print(f'Number of training dataset: {len(train_dataset)}.')
+    print(f'Number of val dataset: {len(val_dataset)}.')
     # model
     mfiller = model_dict[cfg.model_name](cfg)
     if args.load_pretrained:

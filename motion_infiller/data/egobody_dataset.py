@@ -37,7 +37,7 @@ class EgobodyDataset(Dataset):
         excluded_list = ['recording_20210911_S07_S06_03', 'recording_20210911_S07_S06_02']
         for x in excluded_list:
             if x in self.split_list:  # no visible frames
-                self.split_list.remove('recording_20210911_S07_S06_03')
+                self.split_list.remove(x)
         self.data_pare_features, self.data_frame_visibility, self.data_joint_visibility = {}, {}, {}
         self.data_shape, self.data_pose = {}, {}
         self.load_data()

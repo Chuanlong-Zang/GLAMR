@@ -88,7 +88,8 @@ class EgobodyDataset(Dataset):
         else:
             sind = np.argmin(self.seq_lengths.cumsum() <= idx)
             seq = self.sequences[sind]
-            fr_start = idx if sind == 0 else idx - self.seq_lengths.cumsum()[sind - 1]
+            fr_start = self.all_possible_frames[seq][idx] if sind == 0 \
+                else self.all_possible_frames[seq][idx - self.seq_lengths.cumsum()[sind - 1]]
 
         pare_feature, joint_visibility, frame_visibility = self.data_pare_features[seq], \
             self.data_joint_visibility[seq], self.data_frame_visibility[seq]

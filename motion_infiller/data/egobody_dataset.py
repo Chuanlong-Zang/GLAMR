@@ -34,8 +34,10 @@ class EgobodyDataset(Dataset):
             self.split_list.remove(np.nan)
         if first_n != 0:
             self.split_list = self.split_list[:first_n]
-        if 'recording_20210911_S07_S06_03' in self.split_list:  # no visible frames
-            self.split_list.remove('recording_20210911_S07_S06_03')
+        excluded_list = ['recording_20210911_S07_S06_03', 'recording_20210911_S07_S06_02']
+        for x in excluded_list:
+            if x in self.split_list:  # no visible frames
+                self.split_list.remove('recording_20210911_S07_S06_03')
         self.data_pare_features, self.data_frame_visibility, self.data_joint_visibility = {}, {}, {}
         self.data_shape, self.data_pose = {}, {}
         self.load_data()
@@ -86,7 +88,6 @@ class EgobodyDataset(Dataset):
                 if sum(possible_start_frame) != 0:
                     possible_start_idx = np.where(possible_start_frame)[0]
                     fr_start = np.random.choice(possible_start_idx)
-                    print(f'Choose {seq}, starting idx {fr_start}')
                     seq_pare_feature = pare_feature[fr_start: fr_start + self.seq_len].astype(np.float32)
                     frame_loss_mask = np.ones((self.seq_len, 1)).astype(np.float32)  # TODO: check this!
                     eff_seq_len = self.seq_len  # effective seq

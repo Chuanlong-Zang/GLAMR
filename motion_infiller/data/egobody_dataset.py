@@ -32,7 +32,8 @@ class EgobodyDataset(Dataset):
             self.split_list.remove(np.nan)
         if first_n != 0:
             self.split_list = self.split_list[:first_n]
-
+        if 'recording_20210911_S07_S06_03' in self.split_list:  # no visible frames
+            self.split_list.remove('recording_20210911_S07_S06_03')
         self.data_pare_features, self.data_frame_visibility, self.data_joint_visibility = {}, {}, {}
         self.data_shape, self.data_pose = {}, {}
         self.load_data()
@@ -91,6 +92,7 @@ class EgobodyDataset(Dataset):
                     success = True
                 else:
                     print(f'{seq} do not have a possible start frame!')
+
                     # raise NotImplementedError
             else:
                 print(f'{seq} too short!')

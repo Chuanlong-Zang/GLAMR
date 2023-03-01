@@ -66,6 +66,8 @@ if __name__ == '__main__':
                                  ntime_per_epoch=cfg.train_ntime_per_epoch, first_n=args.first_n)
     val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, num_workers=args.nworkers, pin_memory=True,
                                 worker_init_fn=worker_init_fn, drop_last=True)
+    print(f'Length of training set: {len(train_dataset)}.')
+    print(f'Length of training set: {len(val_dataset)}.')
     # model
     mfiller = model_dict[cfg.model_name](cfg)
     if args.load_pretrained:

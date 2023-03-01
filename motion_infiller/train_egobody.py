@@ -21,7 +21,7 @@ from lib.utils.tools import worker_init_fn, find_last_version, get_checkpoint_pa
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', default='motion_infiller_2')
+    parser.add_argument('--cfg', default='motion_infiller_2_mac')
     parser.add_argument('--tmp', action='store_true', default=False)
     parser.add_argument('--ngpus', type=int, default=0)
     parser.add_argument('--gpu_ids', default=None)
@@ -31,7 +31,8 @@ if __name__ == '__main__':
     parser.add_argument('--save_n_epochs', type=int, default=None)
     parser.add_argument('--debug', action='store_true', default=False)
     parser.add_argument('--resume', action='store_true', default=False)
-    parser.add_argument('--first_n', type=int, default=0)
+    parser.add_argument('--load_pretrained', action='store_true', default=False)
+    parser.add_argument('--first_n', type=int, default=1)
     parser.add_argument('--version', type=int, default=None)
     parser.add_argument('--cp', default='last')
     parser.add_argument('--profiler', default=None)
@@ -67,7 +68,10 @@ if __name__ == '__main__':
                                 worker_init_fn=worker_init_fn, drop_last=True)
     # model
     mfiller = model_dict[cfg.model_name](cfg)
-
+    if args.load_pretrained:
+        mfiller.load_state_dict(
+            torch.load('results/motion_filler/motion_infiller_2/version_0/checkpoints/model-best-epoch=0307.ckpt',
+                       map_location=torch.device('cpu'))['state_dict'], strict=False)
     # logger
     if args.resume:
         version = find_last_version(cfg.cfg_dir) if args.version is None else args.version

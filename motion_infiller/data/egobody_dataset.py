@@ -12,7 +12,7 @@ import joblib
 
 class EgobodyDataset(Dataset):
     def __init__(self, original_dataset_dir, pare_result_dir, preprocessed_dir, split, cfg=None, training=True,
-                 seq_len=64, ntime_per_epoch=10000, first_n=0):
+                 seq_len=64, ntime_per_epoch=10000, first_n=0, random=False):
         self.cfg = cfg
         self.original_dataset_dir = original_dataset_dir
         self.pare_result_dir = pare_result_dir
@@ -24,6 +24,7 @@ class EgobodyDataset(Dataset):
         self.epoch_init_seed = None
         self.preserve_first_n = 10
         self.preserve_last_n = 10
+        self.random = random
 
         data_split_df = pd.read_csv(os.path.join(self.original_dataset_dir, 'data_splits.csv'))
         # TODO: hard coded for val on Mac
@@ -43,15 +44,20 @@ class EgobodyDataset(Dataset):
         self.load_data()
 
         self.sequences = list(self.data_frame_visibility.keys())
+        self.all_possible_frames = {}
+        self.calculate_all_possible_frames()
         # compute sampling probablity
-        self.seq_lengths = np.array([x.shape[0] for x in self.data_frame_visibility.values()])
+        self.seq_lengths = np.array([x.shape[0] for x in self.all_possible_frames.values()])
         if cfg is not None and cfg.seq_sampling_method == 'length':
             self.seq_prob = self.seq_lengths / self.seq_lengths.sum()
         else:
             self.seq_prob = None
 
     def __len__(self):
-        return self.ntime_per_epoch // self.seq_len
+        if self.random:
+            return self.ntime_per_epoch // self.seq_len
+        else:
+            return self.seq_lengths.sum()
 
     def set_seq_len(self, seq_len):
         self.seq_len = seq_len
@@ -67,41 +73,34 @@ class EgobodyDataset(Dataset):
             self.data_shape.update({recording: data['smpl_parameters']['shape']})
 
     def __getitem__(self, idx):
-        if self.epoch_init_seed is None:
-            # the above step is necessary for lightning's ddp parallel computing because each node gets a subset (idx) of the dataset
-            self.epoch_init_seed = (np.random.get_state()[1][0] * len(self) + idx) % int(1e8)
-            np.random.seed(self.epoch_init_seed)
-            # print('epoch_init_seed', self.epoch_init_seed)
+        if self.random:
+            if self.epoch_init_seed is None:
+                # the above step is necessary for lightning's ddp parallel computing because each node gets a subset (idx) of the dataset
+                self.epoch_init_seed = (np.random.get_state()[1][0] * len(self) + idx) % int(1e8)
+                np.random.seed(self.epoch_init_seed)
+                # print('epoch_init_seed', self.epoch_init_seed)
 
-        sind = np.random.choice(len(self.sequences), p=self.seq_prob)
-        seq = self.sequences[sind]
+            sind = np.random.choice(len(self.sequences), p=self.seq_prob)
+            seq = self.sequences[sind]
+
+            possible_start_idx = self.all_possible_frames[seq]
+            fr_start = np.random.choice(possible_start_idx)
+        else:
+            sind = np.argmin(self.seq_lengths.cumsum() <= idx)
+            seq = self.sequences[sind]
+            fr_start = idx if sind == 0 else idx - self.seq_lengths.cumsum()[sind - 1]
+
         pare_feature, joint_visibility, frame_visibility = self.data_pare_features[seq], \
             self.data_joint_visibility[seq], self.data_frame_visibility[seq]
         shape, pose = self.data_shape[seq], self.data_pose[seq]
 
-        success = False
-        while not success:
-            if self.seq_len <= self.data_frame_visibility[seq].shape[0]:
-                possible_start_frame = self.find_start_frame(frame_visibility,
-                                                             preserve_first_n=self.preserve_first_n,
-                                                             preserve_last_n=self.preserve_last_n)
-                if sum(possible_start_frame) != 0:
-                    possible_start_idx = np.where(possible_start_frame)[0]
-                    fr_start = np.random.choice(possible_start_idx)
-                    seq_pare_feature = pare_feature[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    frame_loss_mask = np.ones((self.seq_len, 1)).astype(np.float32)  # TODO: check this!
-                    eff_seq_len = self.seq_len  # effective seq
-                    seq_joint_visibility = joint_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    seq_frame_visibility = frame_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    seq_shape = shape[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    seq_pose = pose[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    success = True
-                else:
-                    print(f'{seq} do not have a possible start frame!')
-                    # raise NotImplementedError
-            else:
-                print(f'{seq} too short!')
-                # raise NotImplementedError
+        seq_pare_feature = pare_feature[fr_start: fr_start + self.seq_len].astype(np.float32)
+        frame_loss_mask = np.ones((self.seq_len, 1)).astype(np.float32)  # TODO: check this!
+        eff_seq_len = self.seq_len  # effective seq
+        seq_joint_visibility = joint_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
+        seq_frame_visibility = frame_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
+        seq_shape = shape[fr_start: fr_start + self.seq_len].astype(np.float32)
+        seq_pose = pose[fr_start: fr_start + self.seq_len].astype(np.float32)
 
         data = {
             'point_local_feat': seq_pare_feature,
@@ -131,14 +130,13 @@ class EgobodyDataset(Dataset):
         return result
 
     def calculate_all_possible_frames(self):
-        self.all_possible_frames = {}
         for seq in self.sequences:
             frame_visibility = self.data_frame_visibility[seq]
             possible_start_frame = self.find_start_frame(frame_visibility,
                                                          preserve_first_n=self.preserve_first_n,
                                                          preserve_last_n=self.preserve_last_n)
             possible_start_idx = np.where(possible_start_frame)[0]
-            self.all_possible_frames.update({seq: possible_start_idx.shape[0]})
+            self.all_possible_frames.update({seq: possible_start_idx})
 
 
 if __name__ == "__main__":

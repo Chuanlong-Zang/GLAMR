@@ -22,6 +22,8 @@ class EgobodyDataset(Dataset):
         self.seq_len = seq_len
         self.ntime_per_epoch = ntime_per_epoch
         self.epoch_init_seed = None
+        self.preserve_first_n = 10
+        self.preserve_last_n = 10
 
         data_split_df = pd.read_csv(os.path.join(self.original_dataset_dir, 'data_splits.csv'))
         # TODO: hard coded for val on Mac
@@ -69,34 +71,34 @@ class EgobodyDataset(Dataset):
             np.random.seed(self.epoch_init_seed)
             # print('epoch_init_seed', self.epoch_init_seed)
 
-        success = False
-        while not success:
-            sind = np.random.choice(len(self.sequences), p=self.seq_prob)
-            seq = self.sequences[sind]
-            pare_feature, joint_visibility, frame_visibility = self.data_pare_features[seq], \
-                self.data_joint_visibility[seq], self.data_frame_visibility[seq]
-            shape, pose = self.data_shape[seq], self.data_pose[seq]
+        sind = np.random.choice(len(self.sequences), p=self.seq_prob)
+        seq = self.sequences[sind]
+        pare_feature, joint_visibility, frame_visibility = self.data_pare_features[seq], \
+            self.data_joint_visibility[seq], self.data_frame_visibility[seq]
+        shape, pose = self.data_shape[seq], self.data_pose[seq]
 
-            if self.seq_len <= self.data_frame_visibility[seq].shape[0]:
-                possible_start_frame = self.find_start_frame(frame_visibility, preserve_first_n=10)
-                if sum(possible_start_frame) != 0:
-                    possible_start_idx = np.where(possible_start_frame)[0]
-                    fr_start = np.random.choice(possible_start_idx)
-                    seq_pare_feature = pare_feature[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    frame_loss_mask = np.ones((self.seq_len, 1)).astype(np.float32)  # TODO: check this!
-                    eff_seq_len = self.seq_len  # effective seq
-                    seq_joint_visibility = joint_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    seq_frame_visibility = frame_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    seq_shape = shape[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    seq_pose = pose[fr_start: fr_start + self.seq_len].astype(np.float32)
-                    success = True
-                else:
-                    print(f'{seq} do not have a possible start frame!')
-
-                    # raise NotImplementedError
+        if self.seq_len <= self.data_frame_visibility[seq].shape[0]:
+            possible_start_frame = self.find_start_frame(frame_visibility,
+                                                         preserve_first_n=self.preserve_first_n,
+                                                         preserve_last_n=self.preserve_last_n)
+            if sum(possible_start_frame) != 0:
+                possible_start_idx = np.where(possible_start_frame)[0]
+                fr_start = np.random.choice(possible_start_idx)
+                print(f'Choose {seq}, starting idx {fr_start}')
+                seq_pare_feature = pare_feature[fr_start: fr_start + self.seq_len].astype(np.float32)
+                frame_loss_mask = np.ones((self.seq_len, 1)).astype(np.float32)  # TODO: check this!
+                eff_seq_len = self.seq_len  # effective seq
+                seq_joint_visibility = joint_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
+                seq_frame_visibility = frame_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
+                seq_shape = shape[fr_start: fr_start + self.seq_len].astype(np.float32)
+                seq_pose = pose[fr_start: fr_start + self.seq_len].astype(np.float32)
             else:
-                print(f'{seq} too short!')
+                print(f'{seq} do not have a possible start frame!')
+
                 # raise NotImplementedError
+        else:
+            print(f'{seq} too short!')
+            # raise NotImplementedError
 
         data = {
             'point_local_feat': seq_pare_feature,
@@ -117,12 +119,23 @@ class EgobodyDataset(Dataset):
 
         return data
 
-    def find_start_frame(self, visibility, preserve_first_n=10):
+    def find_start_frame(self, visibility, preserve_first_n=10, preserve_last_n=10):
         result = np.zeros_like(visibility)
         for i in range(visibility.shape[0] - self.seq_len + 1):
-            if sum(visibility[i:i + preserve_first_n]) == preserve_first_n:
+            if (sum(visibility[i:i + preserve_first_n]) == preserve_first_n) and \
+                    (sum(visibility[i + self.seq_len - preserve_last_n:i + self.seq_len]) == preserve_last_n):
                 result[i] = 1
         return result
+
+    def calculate_all_possible_frames(self):
+        self.all_possible_frames = {}
+        for seq in self.sequences:
+            frame_visibility = self.data_frame_visibility[seq]
+            possible_start_frame = self.find_start_frame(frame_visibility,
+                                                         preserve_first_n=self.preserve_first_n,
+                                                         preserve_last_n=self.preserve_last_n)
+            possible_start_idx = np.where(possible_start_frame)[0]
+            self.all_possible_frames.update({seq: possible_start_idx.shape[0]})
 
 
 if __name__ == "__main__":
@@ -139,4 +152,6 @@ if __name__ == "__main__":
     batch_size = 5
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     batch = next(iter(dataloader))
-    print(batch['pose'].shape)
+    dataset.calculate_all_possible_frames()
+    print(dataset.all_possible_frames)
+    print('ok')

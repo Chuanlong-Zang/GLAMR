@@ -18,6 +18,7 @@ from motion_infiller.models import model_dict
 from motion_infiller.utils.config import Config
 from lib.utils.log_utils import TextLogger
 from lib.utils.tools import worker_init_fn, find_last_version, get_checkpoint_path
+import multiprocessing
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -25,7 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('--tmp', action='store_true', default=False)
     parser.add_argument('--ngpus', type=int, default=0)
     parser.add_argument('--gpu_ids', default=None)
-    parser.add_argument('--nworkers', type=int, default=10)
+    parser.add_argument('--nworkers', type=int, default=0)
     parser.add_argument('--precision', type=int, default=32)
     parser.add_argument('--max_epochs', type=int, default=None)
     parser.add_argument('--save_n_epochs', type=int, default=None)
@@ -54,6 +55,9 @@ if __name__ == '__main__':
         torch.autograd.set_detect_anomaly(True)
     torch.set_default_dtype(torch.float32)
 
+    if args.nworkers == 0:
+        args.nworkers = multiprocessing.cpu_count()
+        print(f'Actual number of workers: {args.nworkers}.')
     # train datasets
     train_dataset = EgobodyDataset(cfg.egobody_dataset_dir, cfg.egobody_pare_predict_dir, cfg.egobody_preprocessed_dir,
                                    'train', cfg, seq_len=cfg.seq_len,
@@ -68,6 +72,10 @@ if __name__ == '__main__':
                                 worker_init_fn=worker_init_fn, drop_last=True)
     print(f'Length of training set: {len(train_dataset)}.')
     print(f'Length of training set: {len(val_dataset)}.')
+    train_dataset.calculate_all_possible_frames()
+    print(train_dataset.all_possible_frames)
+    val_dataset.calculate_all_possible_frames()
+    print(val_dataset.all_possible_frames)
     # model
     mfiller = model_dict[cfg.model_name](cfg)
     if args.load_pretrained:

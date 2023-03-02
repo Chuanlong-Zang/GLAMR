@@ -98,10 +98,10 @@ class EgobodyDataset(Dataset):
             self.data_joint_visibility[seq], self.data_frame_visibility[seq]
         shape, pose = self.data_shape[seq], self.data_pose[seq]
 
-        seq_pare_feature = pare_feature[fr_start: fr_start + self.seq_len].astype(np.float32)
+        seq_pare_feature = pare_feature[fr_start: fr_start + self.seq_len].copy().astype(np.float32)
         frame_loss_mask = np.ones((self.seq_len, 1)).astype(np.float32)  # TODO: check this!
         eff_seq_len = self.seq_len  # effective seq
-        seq_joint_visibility = joint_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
+        seq_joint_visibility = joint_visibility[fr_start: fr_start + self.seq_len].copy().astype(np.float32)
         seq_frame_visibility = frame_visibility[fr_start: fr_start + self.seq_len].astype(np.float32)
         seq_shape = shape[fr_start: fr_start + self.seq_len].astype(np.float32)
         seq_pose = pose[fr_start: fr_start + self.seq_len].astype(np.float32)

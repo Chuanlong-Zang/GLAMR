@@ -55,8 +55,7 @@ amass_splits = {
 
 
 if torch.cuda.is_available():
-    device = torch.device('cuda', index=args.gpu)
-    torch.cuda.set_device(args.gpu)
+    device = torch.device('cuda')
 else:
     device = torch.device('cpu')
 smpl = SMPL(SMPL_MODEL_DIR, pose_type='body26fk', create_transl=False).to(device)

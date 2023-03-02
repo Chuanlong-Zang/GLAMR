@@ -78,6 +78,8 @@ class ContextEncoder(nn.Module):
         tf_layers = nn.TransformerEncoderLayer(temporal_cfg['model_dim'], temporal_cfg['nhead'], temporal_cfg['ff_dim'], temporal_cfg['dropout'])
         self.temporal_net = nn.TransformerEncoder(tf_layers, temporal_cfg['nlayer'])
         self.temporal_dim = cur_dim = temporal_cfg['model_dim']
+        self.fuse = temporal_cfg.get('fuse', 'mean')
+        print(self.fuse)
 
         """ out MLP """
         if 'out_mlp' in specs:
@@ -149,7 +151,12 @@ class ContextEncoder(nn.Module):
                 x_out[:, ~all_invisible_joints, :] = x
                 x = x_out
                 x = x.reshape(x.shape[0], batch_size, n_joints, x.shape[-1])
-                x = torch.nanmean(x, 2)  # There could be some joints keeping invisible within these seq, results nan
+
+                if self.fuse == 'mean':
+                    x = torch.nanmean(x, 2)
+                    # There could be some joints keeping invisible within these seq, results nan
+                elif self.fuse == 'sum':
+                    x = torch.nansum(x, 2)
             else:
                 x = self.temporal_net(x, src_key_padding_mask=data['vis_joint_mask'].squeeze(0).T)
                 # x: 50,24,256 mask: 24,50

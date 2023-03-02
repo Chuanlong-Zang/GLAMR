@@ -8,11 +8,12 @@ import pandas as pd
 import glob
 import os
 import joblib
+from scipy.interpolate import interp1d
 
 
 class EgobodyDataset(Dataset):
     def __init__(self, original_dataset_dir, pare_result_dir, preprocessed_dir, split, cfg=None, training=True,
-                 seq_len=64, ntime_per_epoch=10000, first_n=0, random=False):
+                 seq_len=64, ntime_per_epoch=10000, first_n=0, random=False, use_mask=True):
         self.cfg = cfg
         self.original_dataset_dir = original_dataset_dir
         self.pare_result_dir = pare_result_dir
@@ -25,6 +26,8 @@ class EgobodyDataset(Dataset):
         self.preserve_first_n = 10
         self.preserve_last_n = 10
         self.random = random
+        self.use_mask = use_mask
+        self.min_mask, self.max_mask = 10, 30
 
         data_split_df = pd.read_csv(os.path.join(self.original_dataset_dir, 'data_splits.csv'))
         # TODO: hard coded for val on Mac
@@ -103,6 +106,22 @@ class EgobodyDataset(Dataset):
         seq_shape = shape[fr_start: fr_start + self.seq_len].astype(np.float32)
         seq_pose = pose[fr_start: fr_start + self.seq_len].astype(np.float32)
 
+        if self.use_mask:
+            for joint in range(seq_joint_visibility.shape[1]):
+                if sum(seq_joint_visibility[:, joint]) == seq_joint_visibility[:, joint].size:  # all joint visible
+                    drop_len = np.random.randint(self.min_mask, self.max_mask + 1)
+                    start_fr_min = self.preserve_first_n
+                    start_fr_max = min(self.seq_len - drop_len + 1 - self.preserve_last_n, self.seq_len)
+                    start_fr = np.random.randint(start_fr_min, start_fr_max)
+                    end_fr = min(start_fr + drop_len, self.seq_len)
+
+                    seq_joint_visibility[start_fr: end_fr, joint] = 0.
+
+                    vis_ind = np.where(seq_joint_visibility[:, joint])[0]
+                    f = interp1d(vis_ind.astype(np.float32), seq_pare_feature[seq_joint_visibility[:, joint]==1, :, joint],
+                                 axis=0, assume_sorted=True)
+                    seq_pare_feature[:, :, joint] = f(np.arange(self.seq_len, dtype=np.float32))
+
         data = {
             'point_local_feat': seq_pare_feature,
             'seq_name': seq,
@@ -148,7 +167,7 @@ if __name__ == "__main__":
     egobody_preprocessed_dir = 'dataset/egobody_preprocessed'
 
     dataset = EgobodyDataset(egobody_dataset_dir, egobody_pare_predict_dir, egobody_preprocessed_dir,
-                             'train', seq_len=200, first_n=4)
+                             'train', seq_len=50, first_n=4)
     print(f'dataset has {len(dataset)} data')
 
     batch_size = 5

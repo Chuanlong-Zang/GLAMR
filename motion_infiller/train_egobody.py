@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--load_pretrained', action='store_true', default=False)
     parser.add_argument('--first_n', type=int, default=1)
-    parser.add_argument('--random_dataset', action='store_true', default=False)
+    parser.add_argument('--mask_dataset', action='store_true', default=False)
     parser.add_argument('--version', type=int, default=None)
     parser.add_argument('--cp', default='last')
     parser.add_argument('--profiler', default=None)
@@ -63,14 +63,14 @@ if __name__ == '__main__':
     train_dataset = EgobodyDataset(cfg.egobody_dataset_dir, cfg.egobody_pare_predict_dir, cfg.egobody_preprocessed_dir,
                                    'train', cfg, seq_len=cfg.seq_len,
                                    ntime_per_epoch=cfg.train_ntime_per_epoch, first_n=args.first_n
-                                   , random=args.random_dataset)
+                                   , use_mask=args.mask_dataset)
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, num_workers=args.nworkers, pin_memory=True,
                                   worker_init_fn=worker_init_fn, drop_last=True)
     # val datasets
     val_dataset = EgobodyDataset(cfg.egobody_dataset_dir, cfg.egobody_pare_predict_dir, cfg.egobody_preprocessed_dir,
                                  'test', cfg, seq_len=cfg.seq_len,
                                  ntime_per_epoch=cfg.train_ntime_per_epoch, first_n=args.first_n
-                                 , random=args.random_dataset)
+                                 , use_mask=args.mask_dataset)
     val_dataloader = DataLoader(val_dataset, batch_size=cfg.batch_size, num_workers=args.nworkers, pin_memory=True,
                                 worker_init_fn=worker_init_fn, drop_last=True)
     print(f'Number of training dataset: {len(train_dataset)}.')

@@ -23,6 +23,7 @@ model_specs:
       dropout: 0.1
       positional_encoding:
         enc_type: original
+      fuse: sum # mean
 
   data_encoder:
     pooling: attn

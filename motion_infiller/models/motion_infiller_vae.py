@@ -563,8 +563,9 @@ class MotionInfillerVAE(pl.LightningModule):
     def init_batch_data(self, batch):
         data = batch.copy()
         # frame mask to be used by transformers
-        data['invis_joint_mask'] = data['joint_mask'] == 1  # invisble frames are marked as False
-        data['vis_joint_mask'] = ~data['invis_joint_mask']
+        if 'joint_mask' in data:
+            data['invis_joint_mask'] = data['joint_mask'] == 1  # invisble frames are marked as False
+            data['vis_joint_mask'] = ~data['invis_joint_mask']
 
         data['invis_frame_mask'] = data['frame_mask'] == 1     # invisble frames are marked as False
         data['vis_frame_mask'] = ~data['invis_frame_mask']

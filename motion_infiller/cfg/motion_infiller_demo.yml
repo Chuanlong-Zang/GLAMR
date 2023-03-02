@@ -62,7 +62,7 @@ model_specs:
     
 
 # data
-amass_dir: datasets/amass_processed/v1_new
+amass_dir: dataset/amass_processed/v1_new
 max_epochs: 2000
 save_n_epochs: 200
 train_ntime_per_epoch: 1e7

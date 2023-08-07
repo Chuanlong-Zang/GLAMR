@@ -45,7 +45,10 @@ def read_sequence(folder, seq_name, theta_dict, joint_pos_dict, fps, smpl, devic
                 continue
                 
             data = np.load(fname)
-            mocap_framerate = int(data['mocap_framerate'])
+            try:
+                mocap_framerate = int(data['mocap_framerate'])
+            except:
+                mocap_framerate = int(data['mocap_frame_rate'])
             sampling_freq = mocap_framerate // fps
             pose = data['poses'][::sampling_freq, joints_to_use]
             trans = data['trans'][::sampling_freq]

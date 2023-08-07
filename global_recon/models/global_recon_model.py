@@ -184,6 +184,8 @@ class GlobalReconOptimizer:
             new_dict['kp_2d'] = kp_2d_with_score[:, :, :2]
             new_dict['kp_2d_score'] = kp_2d_with_score[:, :, 2]
             new_dict['kp_2d_aligned'] = in_dict['gt']['joints']['j2d']  # new_dict['kp_2d'].copy()
+
+            new_dict['point_local_feat'] = in_dict['est']['point_local_feat']
             try:
                 new_dict['cam_K'] = in_dict['gt']['meta']['cam_K'].reshape((3, 3)).astype(np.float32)
             except KeyError:
@@ -195,7 +197,7 @@ class GlobalReconOptimizer:
                     new_val = np.zeros((max_len,) + new_dict[key].shape[1:], dtype=new_dict[key].dtype)
                     new_val[vis_frames] = new_dict[key]
                     new_dict[key] = new_val
-                for key in ['smpl_pose', 'smpl_beta', 'root_trans_cam', 'smpl_orient_cam']:
+                for key in ['smpl_pose', 'smpl_beta', 'root_trans_cam', 'smpl_orient_cam', 'point_local_feat']:
                     vis_ind = np.where(visible)[0]
                     f = interp1d(vis_ind.astype(np.float32), new_dict[key][visible==1], axis=0, assume_sorted=True,
                                  fill_value="extrapolate")
@@ -431,7 +433,8 @@ class GlobalReconOptimizer:
             batch = {
                 'in_body_pose': pose_dict['smpl_pose_nofill'][exist_fr].unsqueeze(0).clone(),
                 'frame_mask': pose_dict['visible'][exist_fr].unsqueeze(0).clone(),
-                'joint_mask': pose_dict['vis_joints'][exist_fr].unsqueeze(0).clone()
+                'joint_mask': pose_dict['vis_joints'][exist_fr].unsqueeze(0).clone(),
+                'point_local_feat': torch.transpose(pose_dict['point_local_feat'], 0, 1).clone(),
             }
             if self.mt_model.traj_predictor is not None and self.mt_model.traj_predictor.in_joint_pos_only:
                 batch['shape'] = pose_dict['smpl_beta'][exist_fr].unsqueeze(0)

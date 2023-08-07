@@ -49,7 +49,8 @@ amass_splits = {
     'test': [
         'Transitions_mocap',
         'SSM_synced',
-        'HumanEva'
+        'HumanEva',
+        'SOMA'
     ]
 }
 

@@ -75,9 +75,9 @@ if process_rank == -1:
     text_logger = TextLogger(f'{tb_logger.log_dir}/logs/log.txt', cfg=cfg, max_epochs=max_epochs)
     checkpoint_dir = f'{tb_logger.log_dir}/checkpoints'
     loggers = [tb_logger, text_logger]
-    if not args.tmp:
-        wandb_logger = WandbLogger(project="GLAMR.traj_pred", name=f'{cfg.id}_v{version}', save_dir=f'{tb_logger.log_dir}')
-        loggers.append(wandb_logger)
+    # if not args.tmp:
+    #     wandb_logger = WandbLogger(project="GLAMR.traj_pred", name=f'{cfg.id}_v{version}', save_dir=f'{tb_logger.log_dir}')
+    #     loggers.append(wandb_logger)
 else:
     # child processes
     if args.resume:

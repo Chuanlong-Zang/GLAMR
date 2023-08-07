@@ -55,6 +55,7 @@ class EgobodyDataset(Dataset):
             self.seq_prob = self.seq_lengths / self.seq_lengths.sum()
         else:
             self.seq_prob = None
+        self.record_idx_list, self.record_seq_list, self.record_fr_list = [], [], []
 
     def __len__(self):
         if self.random:
@@ -93,6 +94,9 @@ class EgobodyDataset(Dataset):
             seq = self.sequences[sind]
             fr_start = self.all_possible_frames[seq][idx] if sind == 0 \
                 else self.all_possible_frames[seq][idx - self.seq_lengths.cumsum()[sind - 1]]
+            self.record_idx_list.append(idx)
+            self.record_seq_list.append(seq)
+            self.record_fr_list.append(fr_start)
 
         pare_feature, joint_visibility, frame_visibility = self.data_pare_features[seq], \
             self.data_joint_visibility[seq], self.data_frame_visibility[seq]

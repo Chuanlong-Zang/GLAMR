@@ -22,7 +22,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset_root', default='dataset/egobody_dataset')
 parser.add_argument('--preprocess_out_dir', default='dataset/egobody_pare_predicts')
 parser.add_argument('--gpu', type=int, default=0)
-parser.add_argument('--cached', type=int, default=1)
 parser.add_argument('--split', default='all')  # all means train + val
 parser.add_argument('--from_to_index', default='0-0')  # for parallel jobs in slurm
 args = parser.parse_args()
@@ -42,17 +41,15 @@ while np.nan in train_split_list:
 while np.nan in val_split_list:
     val_split_list.remove(np.nan)
 
-def merge_results(file_list, ignore_keys=None):
+def merge_results(file_list):
     results = dict()
     for i in range(len(file_list)):
         pare_result = joblib.load(file_list[i])
         if results:
             for key, value in pare_result.items():
-                if key not in ignore_keys:
-                    results[key] = np.concatenate((results[key], value), axis=0)
+                results[key] = np.concatenate((results[key], value), axis=0)
         else:
             results = pare_result.copy()
-    results = {k: v for k, v in results.items() if k not in ignore_keys}
     return results
 
 
@@ -81,7 +78,7 @@ from_index, to_index = map(int, args.from_to_index.split('-'))
 if from_index == 0 and to_index == 0:
     period_dict = period_dict
 else:
-    period_dict = {k: v[from_index: to_index+1] for k, v in period_dict.items()}
+    period_dict = {k: v[from_index: to_index] for k, v in period_dict.items()}
 
 for period, recording_list in period_dict.items():
     recording_num = len(recording_list)
@@ -109,9 +106,7 @@ for period, recording_list in period_dict.items():
         if osp.exists(pare_results_path):
             pare_results = pickle.load(open(pare_results_path, 'rb'))
         else:
-            ignore_keys = ['smpl_vertices', 'smpl_joints3d', 'smpl_joints2d', 'pred_cam_t', 'pred_pose', 'pred_cam',
-                           'pred_shape', 'smpl_joints3d_smpl_order', 'bboxes', 'orig_cam']
-            pare_results = merge_results(pare_results, ignore_keys=ignore_keys)
+            pare_results = merge_results(pare_results)
             if 'vis_joints' not in pare_results.keys():
                 pare_results = get_joint_visibility_smpl_order(pare_results)
                 pare_results.pop('smpl_joints2d_smpl_order', None)
@@ -122,6 +117,6 @@ for period, recording_list in period_dict.items():
                 print(f'Recording {recording_name} occurs an overflow error, please consider reducing file size!')
                 with open(pare_results_path, 'wb') as f:
                     pickle.dump(pare_results, f, protocol=4)
-            time.sleep(5)  # make sure pickle is saving properly (for large files)
+            time.sleep(1)  # make sure pickle is saving properly (for large files)
 
 print('ok')

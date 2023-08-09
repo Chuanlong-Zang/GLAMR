@@ -35,6 +35,7 @@ else:
 data_split_df = pd.read_csv(os.path.join(args.dataset_root, 'data_splits.csv'))
 train_split_list = list(data_split_df['train'])
 val_split_list = list(data_split_df['val'])
+excluded_list = ['recording_20210911_S07_S06_03']
 conda_path = os.environ["CONDA_PREFIX"].split('/envs')[0]
 while np.nan in train_split_list:
     train_split_list.remove(np.nan)
@@ -85,7 +86,11 @@ for period, recording_list in period_dict.items():
 
     for i in tqdm.tqdm(range(recording_num)):
         recording_name = recording_list[i]
-        print(f'Preprocessing {recording_name}.')
+        if recording_name in excluded_list:
+            print(f'Ignoring {recording_name}')
+            continue
+        else:
+            print(f'Preprocessing {recording_name}.')
 
         if not osp.exists(f'./PARE/logs/{period}/{recording_name}/PV_/pare_results'):
             image_folder = os.path.join(

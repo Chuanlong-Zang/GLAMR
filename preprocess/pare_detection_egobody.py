@@ -114,7 +114,7 @@ for period, recording_list in period_dict.items():
             pare_results = merge_results(pare_results)
             if 'vis_joints' not in pare_results.keys():
                 pare_results = get_joint_visibility_smpl_order(pare_results)
-                pare_results.pop('smpl_joints2d_smpl_order', None)
+                # pare_results.pop('smpl_joints2d_smpl_order', None)
             try:
                 with open(pare_results_path, 'wb') as f:
                     pickle.dump(pare_results, f)
